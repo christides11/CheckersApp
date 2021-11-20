@@ -50,7 +50,7 @@ let IsPositionWithinBounds = function(size, x, y){
 }
 
 let FindMovablePieces = function(board, playerType){
-    var possiblePieces = [];
+    var possiblePieces = []; // Item : [piecePosition : array, possiblePosition : array, isJump : boolean]
     var direction = 1 * (playerType === 'RED' ? 1 : -1); // Top player is going downwards, so we need to flip their movement.
 
     for(var x = 0; x < board.length; x++){
@@ -58,12 +58,26 @@ let FindMovablePieces = function(board, playerType){
             if(board[x][y].occupantType === boardSquareOccupantType.NONE) continue;
             if(board[x][y].playerType !== playerType) continue;
             
+            // Try all the movements this piece has available.
             var currentPieceMovement = pieceMovement[board[x][y].occupantType];
             for(var i = 0; i < currentPieceMovement.length; i++){
+                // Apply the player's direction.
+                currentPieceMovement[i] = [currentPieceMovement[i][0] * direction, currentPieceMovement[i][1] * direction];
                 var wantedPosition = [x + currentPieceMovement[i][0], y + currentPieceMovement[i][1]];
                 if(IsPositionWithinBounds(board.length, wantedPosition[0], wantedPosition[1]) === false) continue;
 
-                // If another player's checker is at this position, check if the jumping position is valid.
+                if(board[wantedPosition[0]][wantedPosition[1]].occupantType === boardSquareOccupantType.NONE){
+                    possiblePieces.append([ [x, y], [wantedPosition[0], wantedPosition[1]], false ]);
+                    continue;
+                }
+
+                if(board[wantedPosition[0]][wantedPosition[1]].occupantType === playerType) continue;
+                // Another player's checker is at this position, check if we can jump it.
+                wantedPosition = [wantedPosition[0] + currentPieceMovement[i][0], wantedPosition[1] + currentPieceMovement[i][1]];
+                if(IsPositionWithinBounds(board.length, wantedPosition[0], wantedPosition[1]) === false) continue;
+                if(board[wantedPosition[0]][wantedPosition[1]].occupantType !== boardSquareOccupantType.NONE) continue;
+                // Jump available.
+                possiblePieces.append([ [x, y], [wantedPosition[0], wantedPosition[1]], true ]);
             }
         }
     }
@@ -85,7 +99,7 @@ let HandlerPieceExtraMovement = function(selectedPiece, selectedSquare, setTurnS
 }
 
 exports.GetMoveableUnits = function(grid, playerType){
-
+    return FindMovablePieces(grid, playerType);
 }
 
 exports.CheckersSolver = function(grid, playerType, setSelectedPiece, selectedPiece, selectedSquare, setTurnState, turnState) {
@@ -106,3 +120,9 @@ exports.CheckersSolver = function(grid, playerType, setSelectedPiece, selectedPi
             break;
     }
 };
+
+console.log("Hello world.");
+
+let testBoard = Array.from( Array(8), () => new Array(8) );
+let testBlackPlayer = [];
+let testRedPlayer = [];
