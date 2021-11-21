@@ -1,5 +1,6 @@
-import { createGlobalStyle } from 'styled-components'
-import Home from './pages/Home'
+import { createGlobalStyle } from "styled-components";
+import Home from "./pages/Home";
+import AuthContextProvider from "./services/AuthContext";
 
 const GlobalStyle = createGlobalStyle`
   * {
@@ -11,7 +12,9 @@ function App() {
   return (
     <>
       <GlobalStyle />
-      <Home />
+      <AuthContextProvider>
+        <Home />
+      </AuthContextProvider>
     </>
   );
 }

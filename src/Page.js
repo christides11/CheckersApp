@@ -1,5 +1,6 @@
-import styled from 'styled-components';
-import SidebarLink from './components/SidebarLink';
+import styled from "styled-components";
+import { default as SidebarLink_m } from "./components/SidebarLink";
+import { useAuth } from './services/AuthContext';
 
 const ParentPage = styled.div`
   height: 100vh;
@@ -40,24 +41,42 @@ const Footer = styled.div`
   text-align: center;
 `;
 
-const Page = ({ sidebar, content }) =>
-(
-  <ParentPage>
-    <Sidebar>
-      <Main>
-        <LogoText>
-          CHECKERS
-        </LogoText>
-        {sidebar}
-      </Main>
-      <Footer>
-        <SidebarLink href="#">Sign In</SidebarLink>
-      </Footer>
-    </Sidebar>
-    <MainContent>
-      {content}
-    </MainContent>
-  </ParentPage>
-);
+const SidebarLink = styled(SidebarLink_m)`
+  font-size: 24px;
+  display: inline;
+  background: initial;
+  outline: initial;
+  border: 0;
+  color: #FFF;
+  cursor: pointer;
+  &:hover {
+        text-decoration: underline;
+    } 
+`;
+
+const Page = ({ sidebar, content }) => {
+  const { currentUser, signInWithGoogle } = useAuth();
+  return (
+    <ParentPage>
+      <Sidebar>
+        <Main>
+          <LogoText>
+            CHECKERS
+          </LogoText>
+          {sidebar}
+        </Main>
+        <Footer>
+          {currentUser ?
+            currentUser.displayName :
+            <SidebarLink as="button" onClick={signInWithGoogle}>Sign In</SidebarLink>
+          }
+        </Footer>
+      </Sidebar>
+      <MainContent>
+        {content}
+      </MainContent>
+    </ParentPage>
+  )
+};
 
 export default Page;
