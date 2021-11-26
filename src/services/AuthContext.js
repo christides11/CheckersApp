@@ -11,14 +11,18 @@ const AuthContext = createContext({
 export const useAuth = () => useContext(AuthContext);
 
 const AuthContextProvider = ({ children }) => {
-  const [currentUser, setCurentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  auth.onAuthStateChanged((user) => {
+    setCurrentUser(user);
+  });
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
     auth.useDeviceLanguage();
     try {
       const result = await signInWithPopup(auth, provider);
-      setCurentUser(result.user);
+      setCurrentUser(result.user);
     } catch (error) {
       // TODO: Remove console.log
       console.log(error);
