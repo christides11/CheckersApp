@@ -56,6 +56,7 @@ const SidebarLink = styled(SidebarLink_m)`
 
 const Page = ({ sidebar, content }) => {
   const { currentUser, signInWithGoogle } = useAuth();
+
   return (
     <ParentPage>
       <Sidebar>
@@ -67,7 +68,7 @@ const Page = ({ sidebar, content }) => {
         </Main>
         <Footer>
           {currentUser ?
-            currentUser.displayName :
+            `${currentUser.authData.displayName} ${currentUser.currentELO}` :
             <SidebarLink as="button" onClick={signInWithGoogle}>Sign In</SidebarLink>
           }
         </Footer>
