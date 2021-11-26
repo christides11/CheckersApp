@@ -48,44 +48,60 @@ let playerType = {
     BLACK: 'BLACK' // Top player.
 }
 
+let GetDirection = function(playerType){
+    return 1 * (playerType === 'RED' ? 1 : -1); // Top player is going downwards, so we need to flip their movement.
+}
+
+
 let IsPositionWithinBounds = function(size, x, y){
     if(x < 0 || x >= size || y < 0 || y >= size) return false;
     return true;
 }
 
+let FindPossibleMove = function(board, playerType, direction, x, y){
+    var possibleMoves = [];
+    
+    if(board[x][y].occupantType === boardSquareOccupantType.NONE) return possibleMoves;
+    if(board[x][y].playerType !== playerType) return possibleMoves;
+    
+    // Try all the movements this piece has available.
+    var currentPieceMovement = pieceMovement[board[x][y].occupantType];
+    for(var i = 0; i < currentPieceMovement.length; i++){
+        // Apply the player's direction.
+        currentPieceMovement[i] = [currentPieceMovement[i][0] * direction, currentPieceMovement[i][1] * direction];
+        var wantedPosition = [x + currentPieceMovement[i][0], y + currentPieceMovement[i][1]];
+        if(IsPositionWithinBounds(board.length, wantedPosition[0], wantedPosition[1]) === false) continue;
+
+        if(board[wantedPosition[0]][wantedPosition[1]].occupantType === boardSquareOccupantType.NONE){
+            possibleMoves.push({ piecePosition: [x, y], possiblePosition: [wantedPosition[0], wantedPosition[1]], isJump: false });
+            continue;
+        }
+
+        if(board[wantedPosition[0]][wantedPosition[1]].playerType === playerType) continue;
+        // Another player's checker is at this position, check if we can jump it.
+        wantedPosition = [wantedPosition[0] + currentPieceMovement[i][0], wantedPosition[1] + currentPieceMovement[i][1]];
+        if(IsPositionWithinBounds(board.length, wantedPosition[0], wantedPosition[1]) === false) continue;
+        if(board[wantedPosition[0]][wantedPosition[1]].occupantType !== boardSquareOccupantType.NONE) continue;
+        // Jump available.
+        possibleMoves.push({ piecePosition: [x, y], possiblePosition: [wantedPosition[0], wantedPosition[1]], isJump: true });
+    }
+    return possibleMoves;
+}
+
+// Find all possible moves for a player on the board currently.
 let FindPossibleMoves = function(board, playerType, filterJumps = true){
     var possibleMoves = []; // Move : [piecePosition : array, possiblePosition : array, isJump : boolean]
-    var direction = 1 * (playerType === 'RED' ? 1 : -1); // Top player is going downwards, so we need to flip their movement.
+    var direction = GetDirection(playerType);
     var jumpExist = false;
 
     for(var x = 0; x < board.length; x++){
         for(var y = 0; y < board[0].length; y++){
-            if(board[x][y].occupantType === boardSquareOccupantType.NONE) continue;
-            if(board[x][y].playerType !== playerType) continue;
-            
-            // Try all the movements this piece has available.
-            var currentPieceMovement = pieceMovement[board[x][y].occupantType];
-            for(var i = 0; i < currentPieceMovement.length; i++){
-                // Apply the player's direction.
-                currentPieceMovement[i] = [currentPieceMovement[i][0] * direction, currentPieceMovement[i][1] * direction];
-                var wantedPosition = [x + currentPieceMovement[i][0], y + currentPieceMovement[i][1]];
-                if(IsPositionWithinBounds(board.length, wantedPosition[0], wantedPosition[1]) === false) continue;
-
-                if(board[wantedPosition[0]][wantedPosition[1]].occupantType === boardSquareOccupantType.NONE){
-                    possibleMoves.push({ piecePosition: [x, y], possiblePosition: [wantedPosition[0], wantedPosition[1]], isJump: false });
-                    continue;
-                }
-
-                if(board[wantedPosition[0]][wantedPosition[1]].playerType === playerType) continue;
-                // Another player's checker is at this position, check if we can jump it.
-                wantedPosition = [wantedPosition[0] + currentPieceMovement[i][0], wantedPosition[1] + currentPieceMovement[i][1]];
-                if(IsPositionWithinBounds(board.length, wantedPosition[0], wantedPosition[1]) === false) continue;
-                if(board[wantedPosition[0]][wantedPosition[1]].occupantType !== boardSquareOccupantType.NONE) continue;
-                // Jump available.
-                possibleMoves.push({ piecePosition: [x, y], possiblePosition: [wantedPosition[0], wantedPosition[1]], isJump: true });
-                jumpExist = true;
-            }
+            possibleMoves = possibleMoves.concat(FindPossibleMove(board, playerType, direction, x, y));
         }
+    }
+
+    for(var i = 0; i < possibleMoves.length; i++){
+        if(possibleMoves[i].isJump === true) jumpExist = true;
     }
 
     if(filterJumps && jumpExist){
@@ -98,7 +114,7 @@ let FindPossibleMoves = function(board, playerType, filterJumps = true){
 }
 
 // Sees if the user selected a piece. If the piece is a valid pick, we'll go to the move state.
-let TrySelectPiece = function(board, playerType, setSelectedPiece, selectedPiece, selectedSquare, setTurnState){
+let TrySelectPiece = function(board, playerType, setSelectedPiece, selectedSquare, setTurnState){
     let possibleMoves = FindPossibleMoves(board, playerType, true);
 
     let foundPiece = false;
@@ -108,39 +124,80 @@ let TrySelectPiece = function(board, playerType, setSelectedPiece, selectedPiece
             break;
         }
     }
+
     if(foundPiece === false){
         console.log(selectedSquare + " can not move this turn.");
-        return null;
+        return;
     }
 
     console.log(selectedSquare + " can move.");
-    // TODO: Return possible moves for specific piece only.
-    return possibleMoves;
+    setSelectedPiece(selectedSquare);
+    setTurnState(turnStateType.PIECE_SELECTED);
 }
 
-let TryMovePiece = function(setSelectedPiece, selectedPiece, selectedSquare, setTurnState){
+let TryMovePiece = function(board, setBoard, playerType, selectedPiece, setSelectedPiece, selectedSquare, setTurnState){
+    let possibleMoves = FindPossibleMoves(board, playerType, true);
 
-}
+    let piece = board[selectedPiece[0]][selectedPiece[1]];
 
-let HandlerPieceExtraMovement = function(selectedPiece, selectedSquare, setTurnState){
+    if(piece.occupantType === boardSquareOccupantType.NONE) return;
+    if(piece.playerType !== playerType) return;
 
+    let moveIndex = -1;
+    for(var i = 0; i < possibleMoves.length; i++){
+        if(possibleMoves[i].piecePosition[0] === selectedPiece[0] && possibleMoves[i].piecePosition[1] === selectedPiece[1]
+            && possibleMoves[i].possiblePosition[0] === selectedSquare[0] && possibleMoves[i].possiblePosition[1] === selectedSquare[1]){
+            moveIndex = i;
+            break;
+        }
+    }
+
+    if(moveIndex === -1) return;
+    let newBoard = Object.assign({}, board);
+    
+    newBoard[selectedSquare[0]][selectedSquare[1]] = Object.assign({}, newBoard[selectedPiece[0]][selectedPiece[1]]);
+    newBoard[selectedPiece[0]][selectedPiece[1]] = {
+        occupantType: 'NONE'
+    };
+
+    // If the move was a jump, we need to check if the piece can jump again. If so, transition to the extra movement state.
+    if(possibleMoves[moveIndex].isJump === true){
+        let pMoves = FindPossibleMove(newBoard, playerType, GetDirection(playerType), selectedSquare[0], selectedSquare[1]);
+
+        var secondaryMovement = false;
+        for(var c = 0; c < pMoves.length; c++){
+            if(pMoves[c].isJump === true){
+                secondaryMovement = true;
+                break;
+            }
+        }
+        // Jump available, this piece must move again.
+        if(secondaryMovement){
+            setSelectedPiece([selectedSquare[0], selectedSquare[1]]);
+            setTurnState(turnStateType.PIECE_EXTRA_MOVEMENT);
+        }
+    }else{
+        setSelectedPiece(null);
+        setTurnState(turnStateType.END_TURN);
+    }
+    setBoard(newBoard);
 }
 
 exports.GetMoveableUnits = function(grid, playerType){
     return FindPossibleMoves(grid, playerType);
 }
 
-exports.CheckersSolver = function(grid, playerType, setSelectedPiece, selectedPiece, selectedSquare, setTurnState, turnState) {
+exports.CheckersSolver = function(board, setBoard, playerType, setSelectedPiece, selectedPiece, selectedSquare, setTurnState, turnState) {
     switch(turnState){
         case turnStateType.PIECE_SELECTION:
-            TrySelectPiece(grid, playerType, setSelectedPiece, selectedPiece, selectedSquare, setTurnState);
+            TrySelectPiece(board, playerType, setSelectedPiece, selectedSquare, setTurnState);
             break;
         case turnStateType.PIECE_SELECTED:
-            TryMovePiece(setSelectedPiece, selectedPiece, selectedSquare, setTurnState);
+            TryMovePiece(board, setBoard, playerType, setSelectedPiece, selectedPiece, setSelectedPiece, selectedSquare, setTurnState);
             break;
-        /*case turnStateType.PIECE_EXTRA_MOVEMENT:
-            HandlerPieceExtraMovement(selectedPiece, selectedSquare, setTurnState);
-            break;*/
+        case turnStateType.PIECE_EXTRA_MOVEMENT:
+            TryMovePiece(board, setBoard, playerType, setSelectedPiece, selectedPiece, setSelectedPiece, selectedSquare, setTurnState);
+            break;
         case turnStateType.END_TURN:
             break;
         default:
@@ -149,6 +206,7 @@ exports.CheckersSolver = function(grid, playerType, setSelectedPiece, selectedPi
     }
 };
 
+/*
 let testBoard = Array.from({length: 8}, () => (
     Array.from({length: 8}, () => ({ occupantType: 'NONE' }) )
 ));
@@ -177,3 +235,4 @@ console.log(FindPossibleMoves(testBoard, 'BLACK'));
 
 TrySelectPiece(testBoard, 'RED', null, null, [0, 0], null);
 TrySelectPiece(testBoard, 'RED', null, null, [3, 3], null);
+*/
