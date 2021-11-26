@@ -6,12 +6,13 @@ const Button = styled.button`
     }
     display: inline-block;
     background: #19A017;
-    padding: 16px 45px;
     color: #FFF;
     font-size: 24px;
     border: none;
     outline: inherit;
     cursor: pointer;
+    width: 240px;
+    height: 60px;
 `;
 
 const Wrapper = styled.div``;
