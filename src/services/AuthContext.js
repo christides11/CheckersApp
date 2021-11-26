@@ -1,6 +1,7 @@
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import { createContext, useContext, useState } from "react";
-import { auth } from "./firebase";
+import { auth, db } from "./firebase";
 
 
 const AuthContext = createContext({
@@ -23,9 +24,23 @@ const AuthContextProvider = ({ children }) => {
     try {
       const result = await signInWithPopup(auth, provider);
       setCurrentUser(result.user);
+      console.log("result", result.user.uid);
+      try {
+        const dbUser = await getDoc(doc(db, "users", result.user.uid));
+        if (!dbUser.exists()) {
+          // user is new and we need to create their elo score etc
+          await setDoc(doc(db, "users", result.user.uid), {
+            currentELO: 0,
+            lastUpdatedELO: 0,
+            username: result.user.displayName
+          });
+        }
+      } catch (e) {
+        console.error("Error initializing user in db ", e);
+      }
     } catch (error) {
       // TODO: Remove console.log
-      console.log(error);
+      console.log("Error signing in user", error);
     }
   }
 
