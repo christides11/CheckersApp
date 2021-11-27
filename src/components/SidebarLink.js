@@ -1,8 +1,10 @@
+import { Link } from "react-router-dom";
 import styled from "styled-components";
 
 const Wrapper = styled.div`
     text-align: center;
     padding: 10px 0;
+    display: ${({ variant }) => variant ? variant : 'block'};
 `;
 
 const ActualLink = styled.a`
@@ -13,9 +15,9 @@ const ActualLink = styled.a`
     text-decoration: none;
 `;
 
-const SidebarLink = ({ children, ...props }) => (
-    <Wrapper>
-        <ActualLink {...props}>
+const SidebarLink = ({ children, variant, ...props }) => (
+    <Wrapper variant={variant}>
+        <ActualLink as={Link} {...props}>
             {children}
         </ActualLink>
     </Wrapper>

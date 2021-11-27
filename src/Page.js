@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import styled from "styled-components";
 import { default as SidebarLink_m } from "./components/SidebarLink";
 import { useAuth } from './services/AuthContext';
@@ -30,6 +31,9 @@ const LogoText = styled.div`
   font-weight: 600;
   text-align: center;
   margin-bottom: 28px;
+    color: #FFF;
+    text-decoration: none;
+    display: block;
 `;
 
 
@@ -43,7 +47,6 @@ const Footer = styled.div`
 
 const SidebarLink = styled(SidebarLink_m)`
   font-size: 24px;
-  display: inline;
   background: initial;
   outline: initial;
   border: 0;
@@ -51,24 +54,29 @@ const SidebarLink = styled(SidebarLink_m)`
   cursor: pointer;
   &:hover {
         text-decoration: underline;
-    } 
+    }
 `;
 
-const Page = ({ sidebar, content }) => {
+const Page = ({ content }) => {
   const { currentUser, signInWithGoogle } = useAuth();
 
   return (
     <ParentPage>
       <Sidebar>
         <Main>
-          <LogoText>
+          <LogoText as={Link} to="/">
             CHECKERS
           </LogoText>
-          {sidebar}
+          <SidebarLink to="/">Play</SidebarLink>
+          <SidebarLink to="/">Rankings</SidebarLink>
+          {/* {sidebar} */}
         </Main>
         <Footer>
           {currentUser ?
-            `${currentUser.authData.displayName} ${currentUser.currentELO}` :
+            <>
+              <SidebarLink to="/profile" variant="inline">{currentUser.authData.displayName}</SidebarLink>
+              {` ${currentUser.currentELO}`}
+            </> :
             <SidebarLink as="button" onClick={signInWithGoogle}>Sign In</SidebarLink>
           }
         </Footer>
@@ -76,7 +84,7 @@ const Page = ({ sidebar, content }) => {
       <MainContent>
         {content}
       </MainContent>
-    </ParentPage>
+    </ParentPage >
   )
 };
 

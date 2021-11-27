@@ -1,5 +1,8 @@
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { createGlobalStyle } from "styled-components";
 import Home from "./pages/Home";
+import Profile from "./pages/Profile";
+import PrivateRoute from "./PrivateRoute";
 import AuthContextProvider from "./services/AuthContext";
 
 const GlobalStyle = createGlobalStyle`
@@ -17,9 +20,15 @@ function App() {
   return (
     <>
       <GlobalStyle />
-      <AuthContextProvider>
-        <Home />
-      </AuthContextProvider>
+      <BrowserRouter>
+        <AuthContextProvider>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            {/* {/* <Route path="expenses" element={<Expenses />} /> */}
+            <Route path="profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+          </Routes>
+        </AuthContextProvider>
+      </BrowserRouter>
     </>
   );
 }
