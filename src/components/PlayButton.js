@@ -1,6 +1,8 @@
+import { Link } from "react-router-dom";
 import styled from "styled-components";
 
 const Button = styled.button`
+    text-decoration: none;
     &:hover {
         background: #158613;
     }
@@ -15,14 +17,14 @@ const Button = styled.button`
     height: 60px;
 `;
 
-const Wrapper = styled.div``;
-
 const PlayButton = ({ children, className, ...props }) => (
-    <Wrapper className={className}>
-        <Button {...props}>
-            {children}
-        </Button>
-    </Wrapper>
+    <div className={className}>
+        <Link {...props}>
+            <Button>
+                {children}
+            </Button>
+        </Link>
+    </div>
 );
 
 export default PlayButton;

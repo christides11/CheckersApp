@@ -21,13 +21,13 @@ const Content = () => {
     <DeadCenter>
       {currentUser && (
         <>
-          <PlayButton>Play Online</PlayButton>
-          <PlayButton>Spectate</PlayButton>
+          <PlayButton to="">Play Online</PlayButton>
+          <PlayButton to="">Spectate</PlayButton>
         </>
       )
       }
-      <PlayButton>Play Local</PlayButton>
-      <PlayButton>Play Computer</PlayButton>
+      <PlayButton to="localmatch">Play Local</PlayButton>
+      <PlayButton to="">Play Computer</PlayButton>
     </DeadCenter>
   )
 };

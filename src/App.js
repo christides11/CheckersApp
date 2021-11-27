@@ -1,6 +1,7 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { createGlobalStyle } from "styled-components";
 import Home from "./pages/Home";
+import LocalMatch from "./pages/LocalMatch";
 import Profile from "./pages/Profile";
 import Rankings from "./pages/Rankings";
 import PrivateRoute from "./PrivateRoute";
@@ -26,6 +27,7 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/rankings" element={<Rankings />} />
+            <Route path="/localmatch" element={<LocalMatch />} />
             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           </Routes>
         </AuthContextProvider>
