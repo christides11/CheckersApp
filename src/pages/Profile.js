@@ -5,8 +5,6 @@ import { default as DeadCenter_m } from '../components/DeadCenter';
 import Page from '../Page';
 import { useAuth } from '../services/AuthContext';
 
-// TODO: Protect this route
-
 const DeadCenter = styled(DeadCenter_m)`
     text-align: center;
 `;
@@ -36,7 +34,6 @@ const Content = () => {
       <EloDisplay>
         {currentUser.currentELO} ELO Score
       </EloDisplay>
-
     </DeadCenter>
   )
 };

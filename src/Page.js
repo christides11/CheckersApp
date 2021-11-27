@@ -68,7 +68,7 @@ const Page = ({ content }) => {
             CHECKERS
           </LogoText>
           <SidebarLink to="/">Play</SidebarLink>
-          <SidebarLink to="/">Rankings</SidebarLink>
+          <SidebarLink to="/rankings">Rankings</SidebarLink>
           {/* {sidebar} */}
         </Main>
         <Footer>
