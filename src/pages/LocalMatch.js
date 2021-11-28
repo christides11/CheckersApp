@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import styled from 'styled-components';
 import { default as DeadCenter_m } from '../components/DeadCenter';
 import Page from '../Page';
-import { GetMoveableUnits } from "../services/checkers_solver";
+import { CheckersSolver, GetMoveableUnits, playerType, turnStateType } from "../services/checkers_solver";
 
 const boardColors = ["#FFCF9F", "#D28C45", "#704923"];
 
@@ -13,7 +14,6 @@ const DeadCenter = styled(DeadCenter_m)`
 const Board = styled.div`
   width: 576px;
   height: 576px;
-  background: #f00; 
   display: flex;
   flex-wrap: wrap;
 `;
@@ -34,15 +34,91 @@ const Piece = styled.div`
   background: ${({ variant }) => variant === "RED" ? "#F00" : "#000"};
 `;
 
-const Break = styled.div`
-  width: 100%;
-  background: #0f0;
+const ModalBackground = styled.div`
+  height: 100vh;
+  width: 100vw;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  background: rgba(0,0,0,0.3);
+  display: flex;
+  font-family: Montserrat, sans-serif;
+  font-size: 24px;
+  color: #FFF;
 `;
 
-const Content = () => {
+const ModalBody = styled.div`
+  background: #787878;
+  width: 300px;
+  height: 361px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+`;
+
+const MenuButton = styled.button`
+   text-decoration: none;
+    &:hover {
+        background: #696e74;
+    }
+    display: inline-block;
+    background: #52565A;
+    color: #FFF;
+    font-size: 24px;
+    border: none;
+    outline: inherit;
+    cursor: pointer;
+    width: 240px;
+    height: 60px;
+`;
+
+const PlayAgainButton = styled(MenuButton)`
+      margin-bottom: 25px;
+      background: #19A017;
+      &:hover {
+        background: #158613;
+    }
+`;
+
+const Modal = ({ winner, setShouldResetStates, shouldResetStates }) => {
+  let navigate = useNavigate();
+  return <ModalBackground>
+    <DeadCenter>
+      <ModalBody>
+        {winner === playerType.RED ? "Red" : "Black"} Won!
+        <div>
+          <PlayAgainButton onClick={() => {
+            setShouldResetStates(!shouldResetStates);
+          }}>
+            Play again
+          </PlayAgainButton>
+          <MenuButton onClick={() => {
+            setShouldResetStates(!shouldResetStates);
+            navigate('/')
+          }}>
+            Return to Menu
+          </MenuButton>
+        </div>
+      </ModalBody>
+    </DeadCenter>
+  </ModalBackground>
+};
+
+
+const Content = ({ setWinner, shouldResetStates }) => {
   const [board, setBoard] = useState();
   const [selectedPiece, setSelectedPiece] = useState();
   const [turn, setTurn] = useState(0);
+  const [turnState, setTurnState] = useState(turnStateType.PIECE_SELECTION);
+
+  useEffect(() => {
+    setSelectedPiece(null);
+    setTurn(0);
+    setTurnState(turnStateType.PIECE_SELECTION);
+    setWinner(null);
+  }, [shouldResetStates, setSelectedPiece, setTurn, setTurnState, setWinner]);
 
   useEffect(() => {
     const buildBoard = Array.from({ length: 8 }, () => (
@@ -81,9 +157,8 @@ const Content = () => {
       }
     }
 
-    console.log(buildBoard);
     setBoard(buildBoard)
-  }, []);
+  }, [shouldResetStates]);
 
   return (
     <DeadCenter>
@@ -96,34 +171,49 @@ const Content = () => {
             let col = i % 8;
             let piece = board[row][col];
             startingBoard.push(
-              <Cell id={i} color={piece.isHighlighted ? boardColors[3] : boardColors[color]}>
+              <Cell id={i} color={piece.isHighlighted ? boardColors[2] : boardColors[color]}
+                onClick={async () => {
+                  if (piece.occupantType === "NONE" && piece.isHighlighted) {
+                    const player = turn === 0 ? playerType.BLACK : playerType.RED;
+                    CheckersSolver(board, setBoard, player, setSelectedPiece, selectedPiece, [row, col],
+                      setTurnState, turnStateType.PIECE_SELECTED, turn, setTurn, setWinner);
+                  }
+                }}>
                 {piece.occupantType !== "NONE" &&
                   <Piece variant={piece.playerType}
                     onClick={() => {
-                      // console.log(FindPossibleMove(board, piece.playerType, 1, row, col));
-                      console.log("Moves", GetMoveableUnits(board, piece.playerType));
                       if ((turn === 0 && piece.playerType === "BLACK") || (turn === 1 && piece.playerType === "RED")) {
                         const moveableUnits = GetMoveableUnits(board, piece.playerType);
-                        const [movePosition] = moveableUnits.filter((moveableUnit) => {
+                        const movePositions = moveableUnits.filter((moveableUnit) => {
                           return moveableUnit.piecePosition[0] === row
                             && moveableUnit.piecePosition[1] === col;
                         });
 
-                        if (!movePosition) {
+                        if (movePositions.length === 0) {
                           return;
                         }
-                        // console.log([row, col])
-                        // console.log(moveableUnits)
-                        // console.log(movePosition);
-                        // const newBoard = board.map((row, i) => {
-                        //   return row.map((col, j) => {
-                        //     if (i === )
-                        //   });
-                        // })
-                      }
 
-                      // CheckersSolver(board, setBoard, piece.playerType, [row, col])
-                      console.log(row, col);
+                        const hashedPositionsList = movePositions.map(({ possiblePosition }) => {
+                          return `${possiblePosition[0]}|${possiblePosition[1]}`;
+                        });
+
+                        CheckersSolver(board, setBoard, piece.playerType, setSelectedPiece,
+                          selectedPiece, [row, col], setTurnState, turnStateType.PIECE_SELECTION,
+                          turn, setTurn, setWinner);
+
+                        const newBoard = board.map((row, i) => {
+                          return row.map((cell, j) => {
+                            const hashedCell = `${i}|${j}`;
+                            if (hashedPositionsList.includes(hashedCell)) {
+                              return { ...cell, isHighlighted: true }
+                            }
+                            return { ...cell, isHighlighted: false }
+                          });
+                        });
+
+                        // can remove piece highlights here if necessary
+                        setBoard(newBoard);
+                      }
                     }}
                   />
                 }
@@ -137,12 +227,29 @@ const Content = () => {
           return startingBoard;
         })()}
       </Board>
+      <button onClick={() => {
+        console.log("Turn State:", turnState);
+      }}>Log State</button>
     </DeadCenter>
   )
 };
 
-const LocalMatch = () => (
-  <Page content={<Content />} />
-);
+const LocalMatch = () => {
+  const [winner, setWinner] = useState();
+  const [shouldResetStates, setShouldResetStates] = useState(false);
+
+  return (
+    <>
+      {winner &&
+        <Modal winner={winner} setShouldResetStates={setShouldResetStates} shouldResetStates={shouldResetStates} />
+      }
+      <Page
+        content={<Content
+          setWinner={setWinner}
+          shouldResetStates={shouldResetStates} />}
+      />
+    </>
+  );
+};
 
 export default LocalMatch;
