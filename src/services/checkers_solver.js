@@ -39,7 +39,7 @@ let boardSquareOccupantType = {
 
 // Assuming we are the bottom player of the board going up.
 let pieceMovement = {
-    "STANDARD": [[1, 1], [-1, 1]],
+    "STANDARD": [[1, -1], [1, 1]],
     "KING": [[1, 1], [-1, 1], [1, -1], [-1, -1]]
 }
 
@@ -49,7 +49,7 @@ let playerType = {
 }
 
 let GetDirection = function(playerType){
-    return 1 * (playerType === 'RED' ? 1 : -1); // Top player is going downwards, so we need to flip their movement.
+    return (playerType === 'RED' ? 1 : -1); // Top player is going downwards, so we need to flip their movement.
 }
 
 
@@ -63,15 +63,12 @@ let FindPossibleMove = function(board, playerType, direction, x, y){
     
     if(board[x][y].occupantType === boardSquareOccupantType.NONE) return possibleMoves;
     if(board[x][y].playerType !== playerType) return possibleMoves;
-    
     // Try all the movements this piece has available.
     var currentPieceMovement = pieceMovement[board[x][y].occupantType];
     for(var i = 0; i < currentPieceMovement.length; i++){
         // Apply the player's direction.
-        currentPieceMovement[i] = [currentPieceMovement[i][0] * direction, currentPieceMovement[i][1] * direction];
-        var wantedPosition = [x + currentPieceMovement[i][0], y + currentPieceMovement[i][1]];
+        var wantedPosition = [x + (currentPieceMovement[i][0] * direction), y + (currentPieceMovement[i][1] * direction)];
         if(IsPositionWithinBounds(board.length, wantedPosition[0], wantedPosition[1]) === false) continue;
-
         if(board[wantedPosition[0]][wantedPosition[1]].occupantType === boardSquareOccupantType.NONE){
             possibleMoves.push({ piecePosition: [x, y], possiblePosition: [wantedPosition[0], wantedPosition[1]], isJump: false });
             continue;
@@ -94,6 +91,7 @@ let FindPossibleMoves = function(board, playerType, filterJumps = true){
     var direction = GetDirection(playerType);
     var jumpExist = false;
 
+    //console.log("Direction is " + direction);
     for(var x = 0; x < board.length; x++){
         for(var y = 0; y < board[0].length; y++){
             possibleMoves = possibleMoves.concat(FindPossibleMove(board, playerType, direction, x, y));
@@ -206,6 +204,7 @@ exports.CheckersSolver = function(board, setBoard, playerType, setSelectedPiece,
     }
 };
 
+
 /*
 let testBoard = Array.from({length: 8}, () => (
     Array.from({length: 8}, () => ({ occupantType: 'NONE' }) )
@@ -224,15 +223,21 @@ let testRedKingPiece = {
     playerType: 'RED'
 };
 
-testBoard[0][0] = Object.assign({}, testRedPiece);
-testBoard[1][1] = Object.assign({}, testRedPiece);
-testBoard[2][0] = Object.assign({}, testRedPiece);
-testBoard[3][3] = Object.assign({}, testRedKingPiece);
-testBoard[4][4] = Object.assign({}, testBlackPiece);
+testBoard[0][1] = Object.assign({}, testRedPiece);
+testBoard[0][3] = Object.assign({}, testRedPiece);
+testBoard[0][5] = Object.assign({}, testRedPiece);
 
-console.log(FindPossibleMoves(testBoard, 'RED'));
+testBoard[7][1] = Object.assign({}, testBlackPiece);
+testBoard[7][3] = Object.assign({}, testBlackPiece);
+testBoard[7][5] = Object.assign({}, testBlackPiece);
+
+//testBoard[0][7] = Object.assign({}, testRedPiece);
+//testBoard[3][3] = Object.assign({}, testRedKingPiece);
+//testBoard[4][4] = Object.assign({}, testBlackPiece);
+
+//console.log(FindPossibleMoves(testBoard, 'RED'));
 console.log(FindPossibleMoves(testBoard, 'BLACK'));
 
-TrySelectPiece(testBoard, 'RED', null, null, [0, 0], null);
-TrySelectPiece(testBoard, 'RED', null, null, [3, 3], null);
+//TrySelectPiece(testBoard, 'RED', null, null, [0, 0], null);
+//TrySelectPiece(testBoard, 'RED', null, null, [3, 3], null);
 */
