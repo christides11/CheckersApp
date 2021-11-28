@@ -1,6 +1,6 @@
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { auth, db } from "./firebase";
 
 
@@ -15,7 +15,7 @@ const AuthContextProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
 
   const setGlobalUser =
-    useCallback(async (user) => {
+    async (user) => {
       let userObj = { authData: user };
       try {
         const dbUser = await getDoc(doc(db, "users", userObj.authData.uid));
@@ -41,7 +41,7 @@ const AuthContextProvider = ({ children }) => {
       } catch (e) {
         console.error("Error initializing user in db ", e);
       }
-    });
+    }
 
   // empty dependency list is intentional as this should only be defined once 
   useEffect(() => {

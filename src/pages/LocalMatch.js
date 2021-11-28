@@ -171,7 +171,7 @@ const Content = ({ setWinner, shouldResetStates }) => {
             let col = i % 8;
             let piece = board[row][col];
             startingBoard.push(
-              <Cell id={i} color={piece.isHighlighted ? boardColors[2] : boardColors[color]}
+              <Cell key={i} color={piece.isHighlighted ? boardColors[2] : boardColors[color]}
                 onClick={async () => {
                   if (piece.occupantType === "NONE" && piece.isHighlighted) {
                     const player = turn === 0 ? playerType.BLACK : playerType.RED;

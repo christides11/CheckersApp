@@ -16,16 +16,19 @@ const RankList = styled.ol`
 const Content = () => {
   const [rankingsList, setRankingsList] = useState();
 
-  useEffect(async () => {
-    const usersRef = collection(db, "users")
-    const rankingsQuery = query(usersRef, orderBy("currentELO", "desc"), limit(10));
-    const querySnapshot = await getDocs(rankingsQuery);
-    const rankings = querySnapshot.docs.map(doc => {
-      const userData = doc.data();
-      return { username: userData.username, elo: userData.currentELO }
-    });
-    console.log(rankings);
-    setRankingsList(rankings);
+  useEffect(() => {
+    const fetchRankings = async () => {
+      const usersRef = collection(db, "users")
+      const rankingsQuery = query(usersRef, orderBy("currentELO", "desc"), limit(10));
+      const querySnapshot = await getDocs(rankingsQuery);
+      const rankings = querySnapshot.docs.map(doc => {
+        const userData = doc.data();
+        return { username: userData.username, elo: userData.currentELO }
+      });
+      setRankingsList(rankings);
+    }
+
+    fetchRankings();
   }, []);
 
   return (
@@ -34,7 +37,7 @@ const Content = () => {
         <RankList>
           {
             rankingsList.map(({ username, elo }, idx) =>
-              <li id={idx}>{username} ({elo})</li>
+              <li key={idx}>{username} ({elo})</li>
             )
           }
         </RankList>
