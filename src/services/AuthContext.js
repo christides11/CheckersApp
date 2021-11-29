@@ -1,18 +1,20 @@
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { createContext, useContext, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { auth, db } from "./firebase";
-
 
 const AuthContext = createContext({
   currentUser: null,
   signInWighGoogle: () => Promise,
+  signOut: () => Promise,
 });
 
 export const useAuth = () => useContext(AuthContext);
 
 const AuthContextProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
+  const navigate = useNavigate();
 
   const setGlobalUser =
     async (user) => {
@@ -46,6 +48,7 @@ const AuthContextProvider = ({ children }) => {
   // empty dependency list is intentional as this should only be defined once 
   useEffect(() => {
     auth.onAuthStateChanged(async (user) => {
+      if (!user) { return; }
       await setGlobalUser(user);
     });
   }, []);
@@ -63,7 +66,12 @@ const AuthContextProvider = ({ children }) => {
     }
   }
 
-  const value = { currentUser, signInWithGoogle };
+  const signOut = async () => {
+    await auth.signOut();
+    window.location.replace("/");
+  }
+
+  const value = { currentUser, signInWithGoogle, signOut };
   return (
     <AuthContext.Provider value={value}>
       {children}

@@ -5,27 +5,67 @@ import { default as DeadCenter_m } from '../components/DeadCenter';
 import Page from '../Page';
 import { CheckersSolver, GetMoveableUnits, playerType, turnStateType } from "../services/checkers_solver";
 
-const boardColors = ["#FFCF9F", "#D28C45", "#704923"];
+export const boardColors = ["#FFCF9F", "#D28C45", "#704923"];
 
-const DeadCenter = styled(DeadCenter_m)`
+export const getInitialBoard = () => {
+  const buildBoard = Array.from({ length: 8 }, () => (
+    Array.from({ length: 8 }, () => ({ occupantType: 'NONE', isHighlighted: false }))
+  ));
+
+  let fillOdd = false;
+  const redPiece = {
+    occupantType: 'STANDARD',
+    playerType: 'RED'
+  }
+  const blackPiece = {
+    occupantType: 'STANDARD',
+    playerType: 'BLACK'
+  }
+
+  for (let i = 0; i < 3; ++i) {
+    for (let j = 0; j < 8; ++j) {
+      if ((j % 2 !== 0 && fillOdd) || (j % 2 === 0 && !fillOdd)) {
+        buildBoard[i][j] = { isHighlighted: false, ...redPiece };
+      }
+      if (j === 7) {
+        fillOdd = !fillOdd;
+      }
+    }
+  }
+
+  for (let i = 5; i < 8; ++i) {
+    for (let j = 0; j < 8; ++j) {
+      if ((j % 2 !== 0 && fillOdd) || (j % 2 === 0 && !fillOdd)) {
+        buildBoard[i][j] = { isHighlighted: false, ...blackPiece };
+      }
+      if (j === 7) {
+        fillOdd = !fillOdd;
+      }
+    }
+  }
+
+  return buildBoard;
+}
+
+export const DeadCenter = styled(DeadCenter_m)`
     text-align: center;
 `;
 
-const Board = styled.div`
+export const Board = styled.div`
   width: 576px;
   height: 576px;
   display: flex;
   flex-wrap: wrap;
 `;
 
-const Cell = styled.div`
+export const Cell = styled.div`
   width: 72px;
   height: 72px;
   display: flex;
   background: ${({ color }) => color};
 `;
 
-const Piece = styled.div`
+export const Piece = styled.div`
   width: 64px;
   height: 64px;
   border-radius: 50%;
@@ -34,7 +74,7 @@ const Piece = styled.div`
   background: ${({ variant }) => variant === "RED" ? "#F00" : "#000"};
 `;
 
-const ModalBackground = styled.div`
+export const ModalBackground = styled.div`
   height: 100vh;
   width: 100vw;
   position: fixed;
@@ -48,7 +88,7 @@ const ModalBackground = styled.div`
   color: #FFF;
 `;
 
-const ModalBody = styled.div`
+export const ModalBody = styled.div`
   background: #787878;
   width: 300px;
   height: 361px;
@@ -58,7 +98,7 @@ const ModalBody = styled.div`
   justify-content: space-between;
 `;
 
-const MenuButton = styled.button`
+export const MenuButton = styled.button`
    text-decoration: none;
     &:hover {
         background: #696e74;
@@ -74,7 +114,7 @@ const MenuButton = styled.button`
     height: 60px;
 `;
 
-const PlayAgainButton = styled(MenuButton)`
+export const PlayAgainButton = styled(MenuButton)`
       margin-bottom: 25px;
       background: #19A017;
       &:hover {
@@ -121,41 +161,7 @@ const Content = ({ setWinner, shouldResetStates }) => {
   }, [shouldResetStates, setSelectedPiece, setTurn, setTurnState, setWinner]);
 
   useEffect(() => {
-    const buildBoard = Array.from({ length: 8 }, () => (
-      Array.from({ length: 8 }, () => ({ occupantType: 'NONE', isHighlighted: false }))
-    ));
-
-    let fillOdd = false;
-    const redPiece = {
-      occupantType: 'STANDARD',
-      playerType: 'RED'
-    }
-    const blackPiece = {
-      occupantType: 'STANDARD',
-      playerType: 'BLACK'
-    }
-
-    for (let i = 0; i < 3; ++i) {
-      for (let j = 0; j < 8; ++j) {
-        if ((j % 2 !== 0 && fillOdd) || (j % 2 === 0 && !fillOdd)) {
-          buildBoard[i][j] = { isHighlighted: false, ...redPiece };
-        }
-        if (j === 7) {
-          fillOdd = !fillOdd;
-        }
-      }
-    }
-
-    for (let i = 5; i < 8; ++i) {
-      for (let j = 0; j < 8; ++j) {
-        if ((j % 2 !== 0 && fillOdd) || (j % 2 === 0 && !fillOdd)) {
-          buildBoard[i][j] = { isHighlighted: false, ...blackPiece };
-        }
-        if (j === 7) {
-          fillOdd = !fillOdd;
-        }
-      }
-    }
+    const buildBoard = getInitialBoard();
 
     setBoard(buildBoard)
   }, [shouldResetStates]);

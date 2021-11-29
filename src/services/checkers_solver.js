@@ -51,7 +51,7 @@ export const playerType = {
 }
 
 let GetDirection = function (playerType) {
-    return (playerType === playerType.RED ? 1 : -1); // Top player is going downwards, so we need to flip their movement.
+    return (playerType === 'RED' ? 1 : -1); // Top player is going downwards, so we need to flip their movement.
 }
 
 

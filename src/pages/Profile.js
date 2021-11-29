@@ -21,7 +21,7 @@ const EloDisplay = styled.div`
 `;
 
 const Content = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, signOut } = useAuth();
   useEffect(() => {
     console.log(currentUser);
   }, [currentUser]);
@@ -34,6 +34,8 @@ const Content = () => {
       <EloDisplay>
         {currentUser.currentELO} ELO Score
       </EloDisplay>
+
+      <button onClick={signOut}>Sign Out</button>
     </DeadCenter>
   )
 };

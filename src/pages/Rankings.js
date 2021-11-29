@@ -18,7 +18,7 @@ const Content = () => {
 
   useEffect(() => {
     const fetchRankings = async () => {
-      const usersRef = collection(db, "users")
+      const usersRef = collection(db, "users");
       const rankingsQuery = query(usersRef, orderBy("currentELO", "desc"), limit(10));
       const querySnapshot = await getDocs(rankingsQuery);
       const rankings = querySnapshot.docs.map(doc => {
