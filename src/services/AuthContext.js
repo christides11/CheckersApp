@@ -24,8 +24,8 @@ const AuthContextProvider = ({ children }) => {
         if (!dbUser.exists()) {
           // user is new and we need to create their elo score etc
           const newUserData = {
-            currentELO: 0,
-            lastUpdatedELO: 0,
+            currentELO: 100,
+            lastUpdatedELO: 100,
             username: userObj.authData.displayName
           };
           await setDoc(doc(db, "users", userObj.authData.uid), newUserData);
