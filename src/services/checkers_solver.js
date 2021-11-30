@@ -22,6 +22,8 @@
     * piecePosition : array, 
     * movePosition : array, 
     * isJump : boolean
+    * jumpPosition : array
+        - Position of the piece being jumped.
 */
 
 import _ from 'lodash';
@@ -89,7 +91,7 @@ let FindPossibleMove = function (board, playerType, direction, x, y) {
         // Another player's checker is at this position, check if we can jump it.
         // keep  this wanted position so we can remove the piece when we jump it
         const tempWantedPosition = wantedPosition;
-        wantedPosition = [wantedPosition[0] + currentPieceMovement[i][0], wantedPosition[1] + currentPieceMovement[i][1]];
+        wantedPosition = [wantedPosition[0] + (currentPieceMovement[i][0] * direction), wantedPosition[1] + (currentPieceMovement[i][1] * direction)];
         if (IsPositionWithinBounds(board.length, wantedPosition[0], wantedPosition[1]) === false) continue;
         if (board[wantedPosition[0]][wantedPosition[1]].occupantType !== boardSquareOccupantType.NONE) continue;
         // Jump available.
@@ -139,8 +141,7 @@ let TrySelectPiece = function (board, playerType, setSelectedPiece, selectedSqua
         console.log(selectedSquare + " can not move this turn.");
         return;
     }
-
-    console.log(selectedSquare + " can move.");
+    
     setSelectedPiece(selectedSquare);
     setTurnState(turnStateType.PIECE_SELECTED);
 }
