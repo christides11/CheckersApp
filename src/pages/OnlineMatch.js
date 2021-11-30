@@ -1,11 +1,13 @@
-import { addDoc, collection, doc, getDocs, limit, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { addDoc, collection, doc, getDoc, getDocs, limit, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import _ from "lodash";
 import { useEffect, useState } from "react";
+import styled from "styled-components";
 import Page from "../Page";
 import { useAuth } from '../services/AuthContext';
 import { CheckersSolver, GetMoveableUnits, playerType, turnStateType } from "../services/checkers_solver";
 import { db } from "../services/firebase";
-import { Board, boardColors, Cell, DeadCenter, getInitialBoard, Piece } from "./LocalMatch";
+import { Board, boardColors, Cell, DeadCenter, getInitialBoard, MenuButton, ModalBackground, ModalBody, Piece, PlayAgainButton } from "./LocalMatch";
+
 
 const rotate180 = (board) => {
   const newBoard = [];
@@ -17,69 +19,149 @@ const rotate180 = (board) => {
   return newBoard;
 }
 
-const Content = () => {
+const OpponentDisplay = styled.div`
+  text-align: right;
+  margin-bottom: 10px;
+`;
+
+const SelfDisplay = styled.div`
+ text-align: left;
+  margin-top: 10px;
+`;
+
+const Modal = ({ winner, whichPlayer, opponent }) => {
+  const { currentUser } = useAuth();
+  // if youre're black and black wone
+  let winnerObject;
+  if ((winner === playerType.BLACK && whichPlayer === 0) ||
+    (winner === playerType.RED && whichPlayer === 1)) {
+    winnerObject = currentUser
+  } else {
+    winnerObject = opponent;
+  }
+  return <ModalBackground>
+    <DeadCenter>
+      <ModalBody>
+        {winnerObject.username} Won!
+        <div>
+          {winnerObject.lastUpdatedELO}
+        </div>
+        <div>
+          <PlayAgainButton onClick={() => {
+            window.location.reload();
+          }}>
+            Find New Match
+          </PlayAgainButton>
+          <MenuButton onClick={() => {
+            window.location.replace("/");
+          }}>
+            Return to Menu
+          </MenuButton>
+        </div>
+      </ModalBody>
+    </DeadCenter>
+  </ModalBackground>
+};
+
+const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent }) => {
   const { currentUser } = useAuth();
   const [board, setBoard] = useState();
   const [selectedPiece, setSelectedPiece] = useState();
   const [turn, setTurn] = useState(0);
   const [turnState, setTurnState] = useState(turnStateType.PIECE_SELECTION);
   const [gameInProgress, setGameInProgress] = useState(false);
-  const [winner, setWinner] = useState();
-  const [shouldResetStates, setShouldResetStates] = useState(false);
   const [gameID, setGameID] = useState();
-
-  // helps to know if to turn board upside down or not
-  const [whichPlayer, setWhichPlayer] = useState();
 
   useEffect(() => {
     const loadGameAsync = async () => {
       let gameID = null;
       const matchesRef = collection(db, "matches");
-      const matchesQuery = query(matchesRef, where("player2", "==", ""), where("player1", "!=", currentUser.authData.uid), limit(1));
-      // const matchesQuery = query(matchesRef, where(documentId(), "==", "JV4ligcxt4ONdOEvsnI7"), limit(1));
-      const querySnapshot = await getDocs(matchesQuery);
-      if (querySnapshot.docs.length === 1) {
-        const gameData = querySnapshot.docs[0].data();
-        gameID = querySnapshot.docs[0].id;
-        updateDoc(doc(db, "matches", gameID), { player2: currentUser.authData.uid }, { merge: true });
-        setGameInProgress(true);
+
+      // if you are already part of a game, join the game
+
+      // separate both queries since there's no OR in firebase
+      const currentMatchesQueryP1 = query(matchesRef, where("player1", "==", currentUser.authData.uid), where("finished", "!=", true), limit(1));
+      const currentMatchesQueryP2 = query(matchesRef, where("player2", "==", currentUser.authData.uid), where("finished", "!=", true), limit(1));
+      const [currentMatchesQuerySnapshotP1, currentMatchesQuerySnapshotP2] = await Promise.all([await getDocs(currentMatchesQueryP1), await getDocs(currentMatchesQueryP2)]);
+      const [currentMatch] = [...currentMatchesQuerySnapshotP1.docs, ...currentMatchesQuerySnapshotP2.docs]
+
+      if (currentMatch) {
+        const gameData = currentMatch.data();
+        console.log(currentMatch.id);
+        gameID = currentMatch.id;
+        setGameInProgress(gameData.player2.length > 0);
         setBoard(JSON.parse(gameData.board));
         setGameID(gameID);
 
         // set player to red since this player is the guest
-        setWhichPlayer(1);
-      } else {
-        // generate board
-        const board = JSON.stringify(getInitialBoard());
-        // make new match
-        const docRef = await addDoc(matchesRef, {
-          player1: currentUser.authData.uid,
-          player2: "",
-          finished: false,
-          spectators: [],
-          created: serverTimestamp(),
-          turn: 0,
-          board
-        });
+        setWhichPlayer(gameData.player1 === currentUser.authData.uid ? 0 : 1);
+        const opponentPlayerID = gameData.player1 === currentUser.authData.uid ? gameData.player2 : gameData.player1;
 
-        gameID = docRef.id;
-        setWhichPlayer(0);
-        setGameID(gameID);
+        if (opponentPlayerID.length > 0) {
+          const opponentPlayerRef = doc(db, "users", opponentPlayerID);
+          const opponentPlayerSnap = await getDoc(opponentPlayerRef);
+          if (opponentPlayerSnap.exists()) {
+            setOpponent(opponentPlayerSnap.data());
+          }
+        }
+      } else {
+
+        const matchesQuery = query(matchesRef, where("player2", "==", ""), where("player1", "!=", currentUser.authData.uid), limit(1));
+        // const matchesQuery = query(matchesRef, where(documentId(), "==", "JV4ligcxt4ONdOEvsnI7"), limit(1));
+        const querySnapshot = await getDocs(matchesQuery);
+        if (querySnapshot.docs.length === 1) {
+          const gameData = querySnapshot.docs[0].data();
+          gameID = querySnapshot.docs[0].id;
+          updateDoc(doc(db, "matches", gameID), { player2: currentUser.authData.uid }, { merge: true });
+          setGameInProgress(true);
+          setBoard(JSON.parse(gameData.board));
+          setGameID(gameID);
+
+          // set player to red since this player is the guest
+          setWhichPlayer(1);
+          const opponentPlayerRef = doc(db, "users", gameData.player1);
+          const opponentPlayerSnap = await getDoc(opponentPlayerRef);
+          if (opponentPlayerSnap.exists()) {
+            setOpponent(opponentPlayerSnap.data());
+          }
+        } else {
+          // generate board
+          const board = JSON.stringify(getInitialBoard());
+          // make new match
+          const docRef = await addDoc(matchesRef, {
+            player1: currentUser.authData.uid,
+            player2: "",
+            finished: false,
+            spectators: [],
+            created: serverTimestamp(),
+            turn: 0,
+            board
+          });
+
+          gameID = docRef.id;
+          setWhichPlayer(0);
+          setGameID(gameID);
+        }
       }
 
       // TODO: call unsub when game over
-      const unsub = onSnapshot(doc(db, "matches", gameID), (doc) => {
-        const newData = doc.data();
-        console.log(newData.board);
+      const unsub = onSnapshot(doc(db, "matches", gameID), async (newDoc) => {
+        const newData = newDoc.data();
         if (newData.board && newData.board.length > 0) {
           setBoard(JSON.parse(newData.board));
         }
 
         setTurn(newData.turn);
 
-        // player2 joined 
+        // player2 joined, or a player re-joined
         if (!gameInProgress && newData.player2.length !== 0) {
           setGameInProgress(true);
+          const opponentPlayerID = newData.player2 !== currentUser.authData.uid ? newData.player2 : newData.player1;
+          const opponentPlayerRef = doc(db, "users", opponentPlayerID);
+          const opponentPlayerSnap = await getDoc(opponentPlayerRef);
+          if (opponentPlayerSnap.exists()) {
+            setOpponent(opponentPlayerSnap.data());
+          }
         }
       });
     }
@@ -102,8 +184,22 @@ const Content = () => {
     updateDoc(doc(db, "matches", gameID), { turn }, { merge: true });
   }
 
+  const setWinnerOnline = async (winner) => {
+    console.log("Winner set");
+    if (!gameInProgress) {
+      return;
+    }
+    // TODO: Update elo score
+    updateDoc(doc(db, "matches", gameID), { finished: true }, { merge: true });
+    setWinner(winner);
+  }
+
   return gameInProgress ?
     <DeadCenter>
+      {board && opponent &&
+        <OpponentDisplay>
+          {opponent.username} ({opponent.currentELO})
+        </OpponentDisplay>}
       <Board>
         {board && (() => {
           let color = 1;
@@ -118,7 +214,7 @@ const Content = () => {
                   if (piece.occupantType === "NONE" && piece.isHighlighted) {
                     const player = turn === 0 ? playerType.BLACK : playerType.RED;
                     CheckersSolver(board, setBoardOnline, player, setSelectedPiece, selectedPiece, [row, col],
-                      setTurnState, turnStateType.PIECE_SELECTED, turn, setTurnOnline, setWinner);
+                      setTurnState, turnStateType.PIECE_SELECTED, turn, setTurnOnline, setWinnerOnline);
                   }
                 }}>
                 {piece.occupantType !== "NONE" &&
@@ -143,7 +239,7 @@ const Content = () => {
 
                         CheckersSolver(board, setBoardOnline, piece.playerType, setSelectedPiece,
                           selectedPiece, [row, col], setTurnState, turnStateType.PIECE_SELECTION,
-                          turn, setTurnOnline, setWinner);
+                          turn, setTurnOnline, setWinnerOnline);
 
                         const newBoard = board.map((row, i) => {
                           return row.map((cell, j) => {
@@ -171,6 +267,9 @@ const Content = () => {
           return whichPlayer === 0 ? startingBoard : rotate180(startingBoard);
         })()}
       </Board>
+      <SelfDisplay>
+        {board && `${currentUser.username} (${currentUser.currentELO})`}
+      </SelfDisplay>
       <button onClick={() => {
         console.log("Turn State:", turnState, "Turn:", turn);
       }}>Log State</button>
@@ -181,11 +280,34 @@ const Content = () => {
 
 };
 
-const OnlineMatch = () => (
-  <Page
-    content={<Content />}
-  // content={<>Hello</>}
-  />
-);
+const OnlineMatch = () => {
+  const [winner, setWinner] = useState();
+
+  // helps to know if to turn board upside down or not
+  const [whichPlayer, setWhichPlayer] = useState();
+  // opponent player details
+  const [opponent, setOpponent] = useState();
+  return (
+    <>
+      {winner &&
+        <Modal
+          winner={winner}
+          opponent={opponent}
+          whichPlayer={whichPlayer}
+        />
+      }
+      <Page
+        content={
+          <Content
+            setWinner={setWinner}
+            whichPlayer={whichPlayer} setWhichPlayer={setWhichPlayer}
+            opponent={opponent} setOpponent={setOpponent}
+          />
+        }
+      // content={<>Hello</>}
+      />
+    </>
+  );
+}
 
 export default OnlineMatch;

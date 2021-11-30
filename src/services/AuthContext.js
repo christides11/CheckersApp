@@ -1,7 +1,6 @@
 import { GoogleAuthProvider, signInWithPopup } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { createContext, useContext, useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { auth, db } from "./firebase";
 
 const AuthContext = createContext({
@@ -14,7 +13,6 @@ export const useAuth = () => useContext(AuthContext);
 
 const AuthContextProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
-  const navigate = useNavigate();
 
   const setGlobalUser =
     async (user) => {
