@@ -31,7 +31,7 @@ const SelfDisplay = styled.div`
 
 const Modal = ({ winner, whichPlayer, opponent }) => {
   const { currentUser } = useAuth();
-  // if youre're black and black wone
+  // if youre're black and black won
   let winnerObject;
   if ((winner === playerType.BLACK && whichPlayer === 0) ||
     (winner === playerType.RED && whichPlayer === 1)) {
