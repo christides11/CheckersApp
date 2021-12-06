@@ -43,7 +43,7 @@ export const getInitialBoard = () => {
       }
     }
   }
-  
+
   return buildBoard;
 }
 
