@@ -22,7 +22,7 @@ const Content = () => {
       {currentUser && (
         <>
           <PlayButton to="/onlinematch">Play Online</PlayButton>
-          <PlayButton to="">Spectate</PlayButton>
+          <PlayButton to="/spectate">Spectate</PlayButton>
         </>
       )
       }
