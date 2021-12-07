@@ -1,6 +1,6 @@
 import { addDoc, collection, doc, getDoc, getDocs, limit, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import _ from "lodash";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import styled from "styled-components";
 import Page from "../Page";
 import { useAuth } from '../services/AuthContext';
@@ -8,6 +8,9 @@ import { CheckersSolver, GetMoveableUnits, playerType, turnStateType } from "../
 import { db } from "../services/firebase";
 import { Board, boardColors, Cell, DeadCenter, getInitialBoard, MenuButton, ModalBackground, ModalBody, Piece, PlayAgainButton } from "./LocalMatch";
 
+const TURN_TIME_LIMIT = 5;
+const PlayersList = ["BLACK", "RED"];
+let timeRemainingCounter;
 
 const rotate180 = (board) => {
   const newBoard = [];
@@ -29,9 +32,21 @@ const SelfDisplay = styled.div`
   margin-top: 10px;
 `;
 
+const Gameview = styled.div`
+  display: flex;
+`;
+
+const TimeView = styled.div`
+  display: flex;
+  flex-direction: column;
+  padding-left: 10px;
+  padding-top: 40px;
+  justify-content: space-between;
+`;
+
 const Modal = ({ winner, whichPlayer, opponent }) => {
   const { currentUser } = useAuth();
-  // if youre're black and black wone
+  // if youre're black and black won
   let winnerObject;
   if ((winner === playerType.BLACK && whichPlayer === 0) ||
     (winner === playerType.RED && whichPlayer === 1)) {
@@ -63,6 +78,31 @@ const Modal = ({ winner, whichPlayer, opponent }) => {
   </ModalBackground>
 };
 
+const timeRemainingReducer = (state, action) => {
+  switch (action.type) {
+    case 'decrement':
+      if (state.timeRemaining === 1) {
+        action.data.setWinnerOnline(action.data.winner);
+        clearInterval(timeRemainingCounter);
+      }
+      return { timeRemaining: state.timeRemaining - 1 };
+    case 'reset':
+      return { timeRemaining: TURN_TIME_LIMIT };
+    case 'set':
+      return { timeRemaining: action.data.secondsRemainingInTurn };
+    default:
+      throw new Error();
+  }
+}
+
+const formatTime = (seconds) => {
+  let minutes = Math.floor(seconds % 60);
+  if (minutes < 10) {
+    minutes = '0' + String(minutes);
+  }
+  return `${Math.floor(seconds / 60)}:${minutes}`
+}
+
 const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent }) => {
   const { currentUser } = useAuth();
   const [board, setBoard] = useState();
@@ -71,9 +111,18 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
   const [turnState, setTurnState] = useState(turnStateType.PIECE_SELECTION);
   const [gameInProgress, setGameInProgress] = useState(false);
   const [gameID, setGameID] = useState();
+  const [timeRemainingState, timeRemainingDispatch] = useReducer(timeRemainingReducer, { timeRemaining: 0 });
+
+  // const timeRemainingDispatchAsync = async (data) => {
+  //   await timeRemainingDispatch
+  // }
+
+  // used in onsnapshot to prevent infinite writes
+  const gameInProgressRef = useRef(false);
 
   useEffect(() => {
     const loadGameAsync = async () => {
+      console.log("loading it");
       let gameID = null;
       const matchesRef = collection(db, "matches");
 
@@ -87,11 +136,35 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
 
       if (currentMatch) {
         const gameData = currentMatch.data();
-        console.log(currentMatch.id);
+        const isMatchInProgress = gameData.player2.length > 0;
         gameID = currentMatch.id;
-        setGameInProgress(gameData.player2.length > 0);
+        console.log("isMatchInProgress", isMatchInProgress);
+        setGameInProgress(isMatchInProgress);
+        gameInProgressRef.current = isMatchInProgress;
         setBoard(JSON.parse(gameData.board));
         setGameID(gameID);
+
+        if (isMatchInProgress) {
+          console.log("here again")
+          // game in progress, start countdown
+          const secondsSinceUTC = Math.floor(new Date() / 1000);
+          const secondsRemainingInTurn = TURN_TIME_LIMIT - (secondsSinceUTC - gameData.lastMoveTime.seconds);
+          console.log("STS", secondsRemainingInTurn);
+          console.log("setting to ")
+          timeRemainingDispatch({ type: 'set', data: { secondsRemainingInTurn } });
+          if (!timeRemainingCounter) {
+            console.log("setting1");
+            timeRemainingCounter = setInterval(() => {
+              timeRemainingDispatch({
+                type: 'decrement',
+                data: {
+                  setWinnerOnline,
+                  winner: turn === whichPlayer ? PlayersList[whichPlayer] : PlayersList[1 - whichPlayer],
+                }
+              });
+            }, 1000);
+          }
+        }
 
         // set player to red since this player is the guest
         setWhichPlayer(gameData.player1 === currentUser.authData.uid ? 0 : 1);
@@ -135,7 +208,8 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
             spectators: [],
             created: serverTimestamp(),
             turn: 0,
-            board
+            board,
+            lastMoveTime: null,
           });
 
           gameID = docRef.id;
@@ -151,11 +225,34 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
           setBoard(JSON.parse(newData.board));
         }
 
+        if (gameInProgressRef.current) {
+          timeRemainingDispatch({ type: 'reset' });
+        }
+
         setTurn(newData.turn);
 
+
         // player2 joined, or a player re-joined
-        if (!gameInProgress && newData.player2.length !== 0) {
+        if (!gameInProgress && !gameInProgressRef.current && newData.player2.length !== 0) {
+          console.log("loading it5");
           setGameInProgress(true);
+          gameInProgressRef.current = true;
+          setGameID(gameID);
+          updateDoc(doc(db, "matches", gameID), { lastMoveTime: serverTimestamp() }, { merge: true });
+          timeRemainingDispatch({ type: 'reset' });
+          if (!timeRemainingCounter) {
+            console.log("setting2");
+
+            timeRemainingCounter = setInterval(() => {
+              timeRemainingDispatch({
+                type: 'decrement',
+                data: {
+                  setWinnerOnline,
+                  winner: turn === whichPlayer ? PlayersList[whichPlayer] : PlayersList[1 - whichPlayer],
+                }
+              });
+            }, 1000);
+          }
           const opponentPlayerID = newData.player2 !== currentUser.authData.uid ? newData.player2 : newData.player1;
           const opponentPlayerRef = doc(db, "users", opponentPlayerID);
           const opponentPlayerSnap = await getDoc(opponentPlayerRef);
@@ -181,97 +278,114 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
       return;
     }
 
-    updateDoc(doc(db, "matches", gameID), { turn }, { merge: true });
+    updateDoc(doc(db, "matches", gameID), { turn, lastMoveTime: serverTimestamp() }, { merge: true });
   }
 
-  const setWinnerOnline = async (winner) => {
+  const setWinnerOnline = useCallback(async (winner) => {
     console.log("Winner set");
-    if (!gameInProgress) {
+    if (!gameInProgressRef.current) {
+      console.log("not in progress", gameInProgress);
       return;
     }
     // TODO: Update elo score
-    updateDoc(doc(db, "matches", gameID), { finished: true }, { merge: true });
+    console.log(db, gameID)
+    await updateDoc(doc(db, "matches", gameID), { finished: true }, { merge: true });
     setWinner(winner);
-  }
+  });
 
   return gameInProgress ?
     <DeadCenter>
-      {board && opponent &&
-        <OpponentDisplay>
-          {opponent.username} ({opponent.currentELO})
-        </OpponentDisplay>}
-      <Board>
-        {board && (() => {
-          let color = 1;
-          let startingBoard = [];
-          for (let i = 0; i < 64; ++i) {
-            let row = Math.floor(i / 8);
-            let col = i % 8;
-            let piece = board[row][col];
-            startingBoard.push(
-              <Cell key={i} color={piece.isHighlighted ? boardColors[2] : boardColors[color]}
-                onClick={async () => {
-                  if (piece.occupantType === "NONE" && piece.isHighlighted) {
-                    const player = turn === 0 ? playerType.BLACK : playerType.RED;
-                    CheckersSolver(board, setBoardOnline, player, setSelectedPiece, selectedPiece, [row, col],
-                      setTurnState, turnStateType.PIECE_SELECTED, turn, setTurnOnline, setWinnerOnline);
-                  }
-                }}>
-                {piece.occupantType !== "NONE" &&
-                  <Piece variant={piece.playerType}
-                    onClick={() => {
-                      console.log(GetMoveableUnits(board, piece.playerType));
-                      console.log("Row:", row, "Col:", col)
-                      if ((turn === 0 && piece.playerType === "BLACK") || (turn === 1 && piece.playerType === "RED")) {
-                        const moveableUnits = GetMoveableUnits(board, piece.playerType);
-                        const movePositions = moveableUnits.filter((moveableUnit) => {
-                          return moveableUnit.piecePosition[0] === row
-                            && moveableUnit.piecePosition[1] === col;
-                        });
 
-                        if (movePositions.length === 0) {
-                          return;
-                        }
-
-                        const hashedPositionsList = movePositions.map(({ possiblePosition }) => {
-                          return `${possiblePosition[0]}|${possiblePosition[1]}`;
-                        });
-
-                        CheckersSolver(board, setBoardOnline, piece.playerType, setSelectedPiece,
-                          selectedPiece, [row, col], setTurnState, turnStateType.PIECE_SELECTION,
-                          turn, setTurnOnline, setWinnerOnline);
-
-                        const newBoard = board.map((row, i) => {
-                          return row.map((cell, j) => {
-                            const hashedCell = `${i}|${j}`;
-                            if (hashedPositionsList.includes(hashedCell)) {
-                              return { ...cell, isHighlighted: true }
-                            }
-                            return { ...cell, isHighlighted: false }
-                          });
-                        });
-
-                        // can remove piece highlights here if necessary
-                        setBoard(newBoard);
-                      }
-                    }}
-                  />
-                }
-              </Cell>
-            );
-            color = color === 0 ? 1 : 0;
-            if ((i + 1) % 8 === 0) {
-              color = color === 0 ? 1 : 0;
-            }
+      <Gameview>
+        <div>
+          {board && opponent &&
+            <OpponentDisplay>
+              {opponent.username} ({opponent.currentELO})
+            </OpponentDisplay>
           }
-          return whichPlayer === 0 ? startingBoard : rotate180(startingBoard);
-        })()}
-      </Board>
+          <Board>
+            {board && (() => {
+              let color = 1;
+              let startingBoard = [];
+              for (let i = 0; i < 64; ++i) {
+                let row = Math.floor(i / 8);
+                let col = i % 8;
+                let piece = board[row][col];
+                startingBoard.push(
+                  <Cell key={i} color={piece.isHighlighted ? boardColors[2] : boardColors[color]}
+                    onClick={async () => {
+                      if (piece.occupantType === "NONE" && piece.isHighlighted) {
+                        const player = turn === 0 ? playerType.BLACK : playerType.RED;
+                        CheckersSolver(board, setBoardOnline, player, setSelectedPiece, selectedPiece, [row, col],
+                          setTurnState, turnStateType.PIECE_SELECTED, turn, setTurnOnline, setWinnerOnline);
+                      }
+                    }}>
+                    {piece.occupantType !== "NONE" &&
+                      <Piece variant={piece.playerType}
+                        onClick={() => {
+                          console.log(GetMoveableUnits(board, piece.playerType));
+                          console.log("Row:", row, "Col:", col)
+                          if ((turn === 0 && piece.playerType === "BLACK") || (turn === 1 && piece.playerType === "RED")) {
+                            const moveableUnits = GetMoveableUnits(board, piece.playerType);
+                            const movePositions = moveableUnits.filter((moveableUnit) => {
+                              return moveableUnit.piecePosition[0] === row
+                                && moveableUnit.piecePosition[1] === col;
+                            });
+
+                            if (movePositions.length === 0) {
+                              return;
+                            }
+
+                            const hashedPositionsList = movePositions.map(({ possiblePosition }) => {
+                              return `${possiblePosition[0]}|${possiblePosition[1]}`;
+                            });
+
+                            CheckersSolver(board, setBoardOnline, piece.playerType, setSelectedPiece,
+                              selectedPiece, [row, col], setTurnState, turnStateType.PIECE_SELECTION,
+                              turn, setTurnOnline, setWinnerOnline);
+
+                            const newBoard = board.map((row, i) => {
+                              return row.map((cell, j) => {
+                                const hashedCell = `${i}|${j}`;
+                                if (hashedPositionsList.includes(hashedCell)) {
+                                  return { ...cell, isHighlighted: true }
+                                }
+                                return { ...cell, isHighlighted: false }
+                              });
+                            });
+
+                            // can remove piece highlights here if necessary
+                            setBoard(newBoard);
+                          }
+                        }}
+                      />
+                    }
+                  </Cell>
+                );
+                color = color === 0 ? 1 : 0;
+                if ((i + 1) % 8 === 0) {
+                  color = color === 0 ? 1 : 0;
+                }
+              }
+              return whichPlayer === 0 ? startingBoard : rotate180(startingBoard);
+            })()}
+          </Board>
+        </div>
+        <TimeView>
+          <div>{turn !== whichPlayer ? formatTime(timeRemainingState.timeRemaining) : '0:00'}</div>
+          <div>{turn === whichPlayer ? formatTime(timeRemainingState.timeRemaining) : '0:00'}</div>
+        </TimeView>
+      </Gameview>
       <SelfDisplay>
         {board && `${currentUser.username} (${currentUser.currentELO})`}
       </SelfDisplay>
+      <div>
+        {timeRemainingState.timeRemaining}
+      </div>
       <button onClick={() => {
-        console.log("Turn State:", turnState, "Turn:", turn);
+        console.log("Turn State:", turnState,
+          "Turn:", turn, "Whichplayer", whichPlayer,
+          "Game in progress", gameInProgress, "Game inp ref", gameInProgressRef);
       }}>Log State</button>
     </DeadCenter>
     : <DeadCenter>
