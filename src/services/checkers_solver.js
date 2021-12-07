@@ -171,6 +171,8 @@ let TryMovePiece = function (board, setBoard, playerType, selectedPiece, setSele
         occupantType: 'NONE'
     };
 
+    TryPromotePiece(newBoard, playerType, selectedSquare[0], selectedSquare[1]);
+
     // If the move was a jump, we need to check if the piece can jump again. If so, transition to the extra movement state.
     if (possibleMoves[moveIndex].isJump === true) {
         const jumpOver = possibleMoves[moveIndex].jumpPos;
@@ -205,6 +207,18 @@ let TryMovePiece = function (board, setBoard, playerType, selectedPiece, setSele
         const winner = turn === 0 ? "BLACK" : "RED";
         setWinner(winner);
     }
+}
+
+let TryPromotePiece = function(grid, playerType, x, y){
+    let wantedRow = playerType === "RED" ? 7 : 0;
+
+    if(x !== wantedRow){
+        return;
+    }
+    grid[x][y] = {     
+        occupantType: boardSquareOccupantType.KING,
+        playerType: playerType,
+    };
 }
 
 export const GetMoveableUnits = function (grid, playerType) {

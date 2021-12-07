@@ -71,7 +71,11 @@ export const Piece = styled.div`
   border-radius: 50%;
   margin: auto;
   border: 5px solid #FFF;
-  background: ${({ variant }) => variant === "RED" ? "#F00" : "#000"};
+  background-color: ${({ variant }) => variant === "RED" ? "#F00" : "#000"};
+  background-repeat: no-repeat;
+  background-position: center; 
+  background-size: 65%;
+  background-image: ${({ pieceType }) => pieceType === "KING" ? "url('/king.png')" : "url('/blank.png')"};
 `;
 
 export const ModalBackground = styled.div`
@@ -186,7 +190,7 @@ const Content = ({ setWinner, shouldResetStates }) => {
                   }
                 }}>
                 {piece.occupantType !== "NONE" &&
-                  <Piece variant={piece.playerType}
+                  <Piece variant={piece.playerType} pieceType={piece.occupantType}
                     onClick={() => {
                       if ((turn === 0 && piece.playerType === "BLACK") || (turn === 1 && piece.playerType === "RED")) {
                         const moveableUnits = GetMoveableUnits(board, piece.playerType);
