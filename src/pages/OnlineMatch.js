@@ -1,14 +1,15 @@
 import { addDoc, collection, doc, getDoc, getDocs, limit, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import _ from "lodash";
-import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 import styled from "styled-components";
 import Page from "../Page";
 import { useAuth } from '../services/AuthContext';
 import { CheckersSolver, GetMoveableUnits, playerType, turnStateType } from "../services/checkers_solver";
 import { db } from "../services/firebase";
+import useFirstRender from "../services/firstrender";
 import { Board, boardColors, Cell, DeadCenter, getInitialBoard, MenuButton, ModalBackground, ModalBody, Piece, PlayAgainButton } from "./LocalMatch";
 
-const TURN_TIME_LIMIT = 5;
+const TURN_TIME_LIMIT = 120;
 const PlayersList = ["BLACK", "RED"];
 let timeRemainingCounter;
 
@@ -82,7 +83,8 @@ const timeRemainingReducer = (state, action) => {
   switch (action.type) {
     case 'decrement':
       if (state.timeRemaining === 1) {
-        action.data.setWinnerOnline(action.data.winner);
+        console.log("Winner is actdata", action.data.winner)
+        action.data.setWinnerOnline(action.data.winner, action.data.gameID, action.data.setWinner);
         clearInterval(timeRemainingCounter);
       }
       return { timeRemaining: state.timeRemaining - 1 };
@@ -113,16 +115,36 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
   const [gameID, setGameID] = useState();
   const [timeRemainingState, timeRemainingDispatch] = useReducer(timeRemainingReducer, { timeRemaining: 0 });
 
-  // const timeRemainingDispatchAsync = async (data) => {
-  //   await timeRemainingDispatch
-  // }
+  const firstRender = useFirstRender();
+
+  // used to refreshesh time function if 
+  const [shouldRefreshTimeFunction, setShouldRefreshTimeFunction] = useState(false);
 
   // used in onsnapshot to prevent infinite writes
   const gameInProgressRef = useRef(false);
 
+  const decrementTime = () => {
+    timeRemainingDispatch({
+      type: 'decrement',
+      data: {
+        winner: turn === whichPlayer ? PlayersList[1 - whichPlayer] : PlayersList[whichPlayer],
+        setWinnerOnline,
+        setWinner,
+        gameID
+      }
+    });
+  }
+
+  useEffect(() => {
+    if (firstRender) return;
+    timeRemainingCounter = setInterval(decrementTime, 1000);
+  }, [shouldRefreshTimeFunction]);
+
+
+  // console.log("TR counter", timeRemainingCounter);
+
   useEffect(() => {
     const loadGameAsync = async () => {
-      console.log("loading it");
       let gameID = null;
       const matchesRef = collection(db, "matches");
 
@@ -138,35 +160,22 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
         const gameData = currentMatch.data();
         const isMatchInProgress = gameData.player2.length > 0;
         gameID = currentMatch.id;
-        console.log("isMatchInProgress", isMatchInProgress);
         setGameInProgress(isMatchInProgress);
         gameInProgressRef.current = isMatchInProgress;
         setBoard(JSON.parse(gameData.board));
         setGameID(gameID);
 
         if (isMatchInProgress) {
-          console.log("here again")
           // game in progress, start countdown
           const secondsSinceUTC = Math.floor(new Date() / 1000);
           const secondsRemainingInTurn = TURN_TIME_LIMIT - (secondsSinceUTC - gameData.lastMoveTime.seconds);
-          console.log("STS", secondsRemainingInTurn);
-          console.log("setting to ")
           timeRemainingDispatch({ type: 'set', data: { secondsRemainingInTurn } });
           if (!timeRemainingCounter) {
-            console.log("setting1");
-            timeRemainingCounter = setInterval(() => {
-              timeRemainingDispatch({
-                type: 'decrement',
-                data: {
-                  setWinnerOnline,
-                  winner: turn === whichPlayer ? PlayersList[whichPlayer] : PlayersList[1 - whichPlayer],
-                }
-              });
-            }, 1000);
+            setShouldRefreshTimeFunction(r => !r);
           }
         }
 
-        // set player to red since this player is the guest
+        // set playertype dependibg on if we are p1 or p2
         setWhichPlayer(gameData.player1 === currentUser.authData.uid ? 0 : 1);
         const opponentPlayerID = gameData.player1 === currentUser.authData.uid ? gameData.player2 : gameData.player1;
 
@@ -178,11 +187,12 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
           }
         }
       } else {
-
+        // we are not currently part of a match
         const matchesQuery = query(matchesRef, where("player2", "==", ""), where("player1", "!=", currentUser.authData.uid), limit(1));
         // const matchesQuery = query(matchesRef, where(documentId(), "==", "JV4ligcxt4ONdOEvsnI7"), limit(1));
         const querySnapshot = await getDocs(matchesQuery);
         if (querySnapshot.docs.length === 1) {
+          // found a game with a player in it 
           const gameData = querySnapshot.docs[0].data();
           gameID = querySnapshot.docs[0].id;
           updateDoc(doc(db, "matches", gameID), { player2: currentUser.authData.uid }, { merge: true });
@@ -199,6 +209,7 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
           }
         } else {
           // generate board
+          console.log("This is where")
           const board = JSON.stringify(getInitialBoard());
           // make new match
           const docRef = await addDoc(matchesRef, {
@@ -221,7 +232,7 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
       // TODO: call unsub when game over
       const unsub = onSnapshot(doc(db, "matches", gameID), async (newDoc) => {
         const newData = newDoc.data();
-        if (newData.board && newData.board.length > 0) {
+        if (newData.board && newData.board.length > 0 && newData.board !== board) {
           setBoard(JSON.parse(newData.board));
         }
 
@@ -234,24 +245,13 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
 
         // player2 joined, or a player re-joined
         if (!gameInProgress && !gameInProgressRef.current && newData.player2.length !== 0) {
-          console.log("loading it5");
           setGameInProgress(true);
           gameInProgressRef.current = true;
           setGameID(gameID);
           updateDoc(doc(db, "matches", gameID), { lastMoveTime: serverTimestamp() }, { merge: true });
           timeRemainingDispatch({ type: 'reset' });
           if (!timeRemainingCounter) {
-            console.log("setting2");
-
-            timeRemainingCounter = setInterval(() => {
-              timeRemainingDispatch({
-                type: 'decrement',
-                data: {
-                  setWinnerOnline,
-                  winner: turn === whichPlayer ? PlayersList[whichPlayer] : PlayersList[1 - whichPlayer],
-                }
-              });
-            }, 1000);
+            setShouldRefreshTimeFunction(r => !r);
           }
           const opponentPlayerID = newData.player2 !== currentUser.authData.uid ? newData.player2 : newData.player1;
           const opponentPlayerRef = doc(db, "users", opponentPlayerID);
@@ -281,7 +281,7 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
     updateDoc(doc(db, "matches", gameID), { turn, lastMoveTime: serverTimestamp() }, { merge: true });
   }
 
-  const setWinnerOnline = useCallback(async (winner) => {
+  const setWinnerOnline = async (winner, gameID, xyz) => {
     console.log("Winner set");
     if (!gameInProgressRef.current) {
       console.log("not in progress", gameInProgress);
@@ -290,8 +290,9 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
     // TODO: Update elo score
     console.log(db, gameID)
     await updateDoc(doc(db, "matches", gameID), { finished: true }, { merge: true });
+    console.log(setWinner, winner)
     setWinner(winner);
-  });
+  }
 
   return gameInProgress ?
     <DeadCenter>
@@ -323,8 +324,8 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
                     {piece.occupantType !== "NONE" &&
                       <Piece variant={piece.playerType}
                         onClick={() => {
-                          console.log(GetMoveableUnits(board, piece.playerType));
-                          console.log("Row:", row, "Col:", col)
+                          // console.log(GetMoveableUnits(board, piece.playerType));
+                          // console.log("Row:", row, "Col:", col)
                           if ((turn === 0 && piece.playerType === "BLACK") || (turn === 1 && piece.playerType === "RED")) {
                             const moveableUnits = GetMoveableUnits(board, piece.playerType);
                             const movePositions = moveableUnits.filter((moveableUnit) => {
@@ -385,7 +386,7 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
       <button onClick={() => {
         console.log("Turn State:", turnState,
           "Turn:", turn, "Whichplayer", whichPlayer,
-          "Game in progress", gameInProgress, "Game inp ref", gameInProgressRef);
+          "Game in progress", gameInProgress, "Game inp ref", gameInProgressRef, "Game ID", gameID);
       }}>Log State</button>
     </DeadCenter>
     : <DeadCenter>
