@@ -173,6 +173,7 @@ let TryMovePiece = function (board, setBoard, playerType, selectedPiece, setSele
 
     TryPromotePiece(newBoard, playerType, selectedSquare[0], selectedSquare[1]);
 
+    let secondaryMovement = false;
     // If the move was a jump, we need to check if the piece can jump again. If so, transition to the extra movement state.
     if (possibleMoves[moveIndex].isJump === true) {
         const jumpOver = possibleMoves[moveIndex].jumpPos;
@@ -182,25 +183,26 @@ let TryMovePiece = function (board, setBoard, playerType, selectedPiece, setSele
         };
         let pMoves = FindPossibleMove(newBoard, playerType, GetDirection(playerType), selectedSquare[0], selectedSquare[1]);
 
-        var secondaryMovement = false;
         for (var c = 0; c < pMoves.length; c++) {
             if (pMoves[c].isJump === true) {
                 secondaryMovement = true;
                 break;
             }
         }
+
         // Jump available, this piece must move again.
-        if (secondaryMovement) {
+        if (secondaryMovement === true) {
             setSelectedPiece([selectedSquare[0], selectedSquare[1]]);
             setTurnState(turnStateType.PIECE_EXTRA_MOVEMENT);
         }
-    } else {
-
+    }
+    
+    if(possibleMoves[moveIndex].isJump === false || secondaryMovement === false){
         setSelectedPiece(null);
         setTurnState(turnStateType.END_TURN);
+        setTurn(turn === 0 ? 1 : 0);
     }
 
-    setTurn(turn === 0 ? 1 : 0);
     setBoard(removeHighlights(newBoard));
 
     if (FindPossibleMoves(newBoard, turn === 0 ? "RED" : "BLACK").length === 0) {
