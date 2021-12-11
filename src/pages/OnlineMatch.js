@@ -288,9 +288,9 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
       return;
     }
     // TODO: Update elo score
-    console.log(db, gameID)
+    console.log(db, gameID);
     await updateDoc(doc(db, "matches", gameID), { finished: true }, { merge: true });
-    console.log(setWinner, winner)
+    console.log(setWinner, winner);
     setWinner(winner);
   }
 

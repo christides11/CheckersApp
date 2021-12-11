@@ -5,7 +5,7 @@ import LocalMatch from "./pages/LocalMatch";
 import OnlineMatch from "./pages/OnlineMatch";
 import Profile from "./pages/Profile";
 import Rankings from "./pages/Rankings";
-import Spectate from "./pages/Spectate";
+import SpectateList from "./pages/SpectateList";
 import PrivateRoute from "./PrivateRoute";
 import AuthContextProvider from "./services/AuthContext";
 
@@ -32,7 +32,7 @@ function App() {
             <Route path="/localmatch" element={<LocalMatch />} />
             <Route path="/onlinematch" element={<PrivateRoute><OnlineMatch /></PrivateRoute>} />
             <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-            <Route path="/spectate" element={<PrivateRoute><Spectate /></PrivateRoute>} />
+            <Route path="/spectate" element={<PrivateRoute><SpectateList /></PrivateRoute>} />
           </Routes>
         </AuthContextProvider>
       </BrowserRouter>

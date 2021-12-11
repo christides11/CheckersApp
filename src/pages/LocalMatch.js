@@ -78,6 +78,15 @@ export const Piece = styled.div`
   background-image: ${({ pieceType }) => pieceType === "KING" ? "url('/king.png')" : "url('/blank.png')"};
 `;
 
+export const TurnIcon = styled.div`
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  margin: auto;
+  border: 5px solid #FFF;
+  background-color: ${({ t }) => t === 1 ? "#F00" : "#000"};
+`;
+
 export const ModalBackground = styled.div`
   height: 100vh;
   width: 100vw;
@@ -240,6 +249,7 @@ const Content = ({ setWinner, shouldResetStates }) => {
       <button onClick={() => {
         console.log("Turn State:", turnState);
       }}>Log State</button>
+      <TurnIcon t={turn}></TurnIcon>
     </DeadCenter>
   )
 };
