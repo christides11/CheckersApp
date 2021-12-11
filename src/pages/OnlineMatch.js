@@ -322,7 +322,7 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
                       }
                     }}>
                     {piece.occupantType !== "NONE" &&
-                      <Piece variant={piece.playerType}
+                      <Piece variant={piece.playerType} pieceType={piece.occupantType}
                         onClick={() => {
                           // console.log(GetMoveableUnits(board, piece.playerType));
                           // console.log("Row:", row, "Col:", col)
