@@ -1,3 +1,4 @@
+import EloRating from "elo-rating";
 import { addDoc, collection, doc, getDoc, getDocs, limit, onSnapshot, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
 import _ from "lodash";
 import { useEffect, useReducer, useRef, useState } from "react";
@@ -9,9 +10,10 @@ import { db } from "../services/firebase";
 import useFirstRender from "../services/firstrender";
 import { Board, boardColors, Cell, DeadCenter, getInitialBoard, MenuButton, ModalBackground, ModalBody, Piece, PlayAgainButton } from "./LocalMatch";
 
-const TURN_TIME_LIMIT = 120;
+const TURN_TIME_LIMIT = 15;
 const PlayersList = ["BLACK", "RED"];
 let timeRemainingCounter;
+let unsub;
 
 const rotate180 = (board) => {
   const newBoard = [];
@@ -45,7 +47,7 @@ const TimeView = styled.div`
   justify-content: space-between;
 `;
 
-const Modal = ({ winner, whichPlayer, opponent }) => {
+const Modal = ({ winner, whichPlayer, opponent, eloIncrease }) => {
   const { currentUser } = useAuth();
   // if youre're black and black won
   let winnerObject;
@@ -60,7 +62,7 @@ const Modal = ({ winner, whichPlayer, opponent }) => {
       <ModalBody>
         {winnerObject.username} Won!
         <div>
-          {winnerObject.lastUpdatedELO}
+          {winnerObject.lastUpdatedELO} (+{eloIncrease})
         </div>
         <div>
           <PlayAgainButton onClick={() => {
@@ -79,24 +81,6 @@ const Modal = ({ winner, whichPlayer, opponent }) => {
   </ModalBackground>
 };
 
-const timeRemainingReducer = (state, action) => {
-  switch (action.type) {
-    case 'decrement':
-      if (state.timeRemaining === 1) {
-        console.log("Winner is actdata", action.data.winner)
-        action.data.setWinnerOnline(action.data.winner, action.data.gameID, action.data.setWinner);
-        clearInterval(timeRemainingCounter);
-      }
-      return { timeRemaining: state.timeRemaining - 1 };
-    case 'reset':
-      return { timeRemaining: TURN_TIME_LIMIT };
-    case 'set':
-      return { timeRemaining: action.data.secondsRemainingInTurn };
-    default:
-      throw new Error();
-  }
-}
-
 const formatTime = (seconds) => {
   let minutes = Math.floor(seconds % 60);
   if (minutes < 10) {
@@ -105,7 +89,7 @@ const formatTime = (seconds) => {
   return `${Math.floor(seconds / 60)}:${minutes}`
 }
 
-const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent }) => {
+const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent, setEloIncrease }) => {
   const { currentUser } = useAuth();
   const [board, setBoard] = useState();
   const [selectedPiece, setSelectedPiece] = useState();
@@ -113,8 +97,6 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
   const [turnState, setTurnState] = useState(turnStateType.PIECE_SELECTION);
   const [gameInProgress, setGameInProgress] = useState(false);
   const [gameID, setGameID] = useState();
-  const [timeRemainingState, timeRemainingDispatch] = useReducer(timeRemainingReducer, { timeRemaining: 0 });
-
   const firstRender = useFirstRender();
 
   // used to refresh time function since just setInterval isn't friends with state information
@@ -123,14 +105,54 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
   // used in onsnapshot to prevent infinite writes
   const gameInProgressRef = useRef(false);
 
+  const setWinnerOnline = async (winner, gameID) => {
+    if (!gameInProgressRef.current) {
+      return;
+    }
+
+    let thisUserWon;
+    if ((winner === playerType.BLACK && whichPlayer === 0) ||
+      (winner === playerType.RED && whichPlayer === 1)) {
+      thisUserWon = true;
+    } else {
+      thisUserWon = false;
+    }
+    const { playerRating, opponentRating } = EloRating.calculate(currentUser.currentELO, opponent.currentELO, thisUserWon);
+    const updatePlayerElo = updateDoc(doc(db, "users", currentUser.authData.uid), { currentELO: playerRating }, { merge: true });
+    const updateOpponentElo = updateDoc(doc(db, "users", opponent.uid), { currentELO: opponentRating }, { merge: true });
+    setEloIncrease(Math.max(playerRating - currentUser.currentELO, opponentRating - opponent.currentELO));
+    await Promise.all([
+      await updatePlayerElo,
+      await updateOpponentElo,
+      await updateDoc(doc(db, "matches", gameID), { finished: true }, { merge: true })
+    ]);
+    clearInterval(timeRemainingCounter);
+    setWinner(winner);
+  }
+
+  const timeRemainingReducer = (state, action) => {
+    switch (action.type) {
+      case 'decrement':
+        if (state.timeRemaining === 1) {
+          setWinnerOnline(action.data.winner, gameID);
+        }
+        return { timeRemaining: state.timeRemaining - 1 };
+      case 'reset':
+        return { timeRemaining: TURN_TIME_LIMIT };
+      case 'set':
+        return { timeRemaining: action.data.secondsRemainingInTurn };
+      default:
+        throw new Error();
+    }
+  }
+
+  const [timeRemainingState, timeRemainingDispatch] = useReducer(timeRemainingReducer, { timeRemaining: 0 });
+
   const decrementTime = () => {
     timeRemainingDispatch({
       type: 'decrement',
       data: {
         winner: turn === whichPlayer ? PlayersList[1 - whichPlayer] : PlayersList[whichPlayer],
-        setWinnerOnline,
-        setWinner,
-        gameID
       }
     });
   }
@@ -140,8 +162,6 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
     timeRemainingCounter = setInterval(decrementTime, 1000);
   }, [shouldRefreshTimeFunction]);
 
-
-  // console.log("TR counter", timeRemainingCounter);
 
   useEffect(() => {
     const loadGameAsync = async () => {
@@ -183,7 +203,7 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
           const opponentPlayerRef = doc(db, "users", opponentPlayerID);
           const opponentPlayerSnap = await getDoc(opponentPlayerRef);
           if (opponentPlayerSnap.exists()) {
-            setOpponent(opponentPlayerSnap.data());
+            setOpponent({ ...opponentPlayerSnap.data(), uid: opponentPlayerID });
           }
         }
       } else {
@@ -195,21 +215,11 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
           // found a game with a player in it 
           const gameData = querySnapshot.docs[0].data();
           gameID = querySnapshot.docs[0].id;
-          updateDoc(doc(db, "matches", gameID), { player2: currentUser.authData.uid }, { merge: true });
-          setGameInProgress(true);
-          setBoard(JSON.parse(gameData.board));
           setGameID(gameID);
-
-          // set player to red since this player is the guest
           setWhichPlayer(1);
-          const opponentPlayerRef = doc(db, "users", gameData.player1);
-          const opponentPlayerSnap = await getDoc(opponentPlayerRef);
-          if (opponentPlayerSnap.exists()) {
-            setOpponent(opponentPlayerSnap.data());
-          }
+          updateDoc(doc(db, "matches", gameID), { player2: currentUser.authData.uid }, { merge: true });
         } else {
           // generate board
-          console.log("This is where")
           const board = JSON.stringify(getInitialBoard());
           // make new match
           const docRef = await addDoc(matchesRef, {
@@ -228,42 +238,52 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
           setGameID(gameID);
         }
       }
-
-      // TODO: call unsub when game over
-      const unsub = onSnapshot(doc(db, "matches", gameID), async (newDoc) => {
-        const newData = newDoc.data();
-        if (newData.board && newData.board.length > 0 && newData.board !== board) {
-          setBoard(JSON.parse(newData.board));
-        }
-
-        if (gameInProgressRef.current) {
-          timeRemainingDispatch({ type: 'reset' });
-        }
-
-        setTurn(newData.turn);
-
-
-        // player2 joined, or a player re-joined
-        if (!gameInProgress && !gameInProgressRef.current && newData.player2.length !== 0) {
-          setGameInProgress(true);
-          gameInProgressRef.current = true;
-          setGameID(gameID);
-          updateDoc(doc(db, "matches", gameID), { lastMoveTime: serverTimestamp() }, { merge: true });
-          timeRemainingDispatch({ type: 'reset' });
-          if (!timeRemainingCounter) {
-            setShouldRefreshTimeFunction(r => !r);
-          }
-          const opponentPlayerID = newData.player2 !== currentUser.authData.uid ? newData.player2 : newData.player1;
-          const opponentPlayerRef = doc(db, "users", opponentPlayerID);
-          const opponentPlayerSnap = await getDoc(opponentPlayerRef);
-          if (opponentPlayerSnap.exists()) {
-            setOpponent(opponentPlayerSnap.data());
-          }
-        }
-      });
     }
+
     loadGameAsync();
   }, []);
+
+  useEffect(() => {
+    if (!gameID) return;
+    if (unsub) {
+      unsub();
+    }
+    unsub = onSnapshot(doc(db, "matches", gameID), async (newDoc) => {
+      const newData = newDoc.data();
+      if (!newData) {
+        return;
+      }
+
+      if (newData.board && newData.board.length > 0 && newData.board !== board) {
+        setBoard(JSON.parse(newData.board));
+      }
+
+      if (gameInProgressRef.current) {
+        timeRemainingDispatch({ type: 'reset' });
+      }
+
+      setTurn(newData.turn);
+
+      // player2 joined, or a player re-joined
+      if (!gameInProgress && !gameInProgressRef.current && newData.player2.length !== 0) {
+        setGameInProgress(true);
+        gameInProgressRef.current = true;
+        setGameID(gameID);
+        await updateDoc(doc(db, "matches", gameID), { lastMoveTime: serverTimestamp() }, { merge: true });
+        timeRemainingDispatch({ type: 'reset' });
+        if (!timeRemainingCounter) {
+          setShouldRefreshTimeFunction(r => !r);
+        }
+        const opponentPlayerID = newData.player2 !== currentUser.authData.uid ? newData.player2 : newData.player1;
+        const opponentPlayerRef = doc(db, "users", opponentPlayerID);
+        const opponentPlayerSnap = await getDoc(opponentPlayerRef);
+        if (opponentPlayerSnap.exists()) {
+          setOpponent({ ...opponentPlayerSnap.data(), uid: opponentPlayerID });
+        }
+      }
+    });
+    return () => unsub();
+  }, [gameID, gameInProgress, opponent]);
 
   const setBoardOnline = async (board) => {
     if (!gameInProgress) {
@@ -281,22 +301,8 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
     updateDoc(doc(db, "matches", gameID), { turn, lastMoveTime: serverTimestamp() }, { merge: true });
   }
 
-  const setWinnerOnline = async (winner, gameID, xyz) => {
-    console.log("Winner set");
-    if (!gameInProgressRef.current) {
-      console.log("not in progress", gameInProgress);
-      return;
-    }
-    // TODO: Update elo score
-    console.log(db, gameID);
-    await updateDoc(doc(db, "matches", gameID), { finished: true }, { merge: true });
-    console.log(setWinner, winner);
-    setWinner(winner);
-  }
-
   return gameInProgress ?
     <DeadCenter>
-
       <Gameview>
         <div>
           {board && opponent &&
@@ -324,8 +330,6 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
                     {piece.occupantType !== "NONE" &&
                       <Piece variant={piece.playerType} pieceType={piece.occupantType}
                         onClick={() => {
-                          // console.log(GetMoveableUnits(board, piece.playerType));
-                          // console.log("Row:", row, "Col:", col)
                           if ((turn === 0 && piece.playerType === "BLACK") || (turn === 1 && piece.playerType === "RED")) {
                             const moveableUnits = GetMoveableUnits(board, piece.playerType);
                             const movePositions = moveableUnits.filter((moveableUnit) => {
@@ -386,7 +390,8 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
       <button onClick={() => {
         console.log("Turn State:", turnState,
           "Turn:", turn, "Whichplayer", whichPlayer,
-          "Game in progress", gameInProgress, "Game inp ref", gameInProgressRef, "Game ID", gameID);
+          "Game in progress", gameInProgress, "Game inp ref", gameInProgressRef, "Game ID", gameID,
+          "Opponent", opponent, "Current user", currentUser);
       }}>Log State</button>
     </DeadCenter>
     : <DeadCenter>
@@ -402,12 +407,15 @@ const OnlineMatch = () => {
   const [whichPlayer, setWhichPlayer] = useState();
   // opponent player details
   const [opponent, setOpponent] = useState();
+
+  const [eloIncrease, setEloIncrease] = useState();
   return (
     <>
       {winner &&
         <Modal
           winner={winner}
           opponent={opponent}
+          eloIncrease={eloIncrease}
           whichPlayer={whichPlayer}
         />
       }
@@ -415,11 +423,11 @@ const OnlineMatch = () => {
         content={
           <Content
             setWinner={setWinner}
+            setEloIncrease={setEloIncrease}
             whichPlayer={whichPlayer} setWhichPlayer={setWhichPlayer}
             opponent={opponent} setOpponent={setOpponent}
           />
         }
-      // content={<>Hello</>}
       />
     </>
   );
