@@ -109,6 +109,7 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
     if (!gameInProgressRef.current) {
       return;
     }
+    clearInterval(timeRemainingCounter);
 
     let thisUserWon;
     if ((winner === playerType.BLACK && whichPlayer === 0) ||
@@ -120,13 +121,13 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
     const { playerRating, opponentRating } = EloRating.calculate(currentUser.currentELO, opponent.currentELO, thisUserWon);
     const updatePlayerElo = updateDoc(doc(db, "users", currentUser.authData.uid), { currentELO: playerRating }, { merge: true });
     const updateOpponentElo = updateDoc(doc(db, "users", opponent.uid), { currentELO: opponentRating }, { merge: true });
-    setEloIncrease(Math.max(playerRating - currentUser.currentELO, opponentRating - opponent.currentELO));
     await Promise.all([
       await updatePlayerElo,
       await updateOpponentElo,
       await updateDoc(doc(db, "matches", gameID), { finished: true }, { merge: true })
     ]);
-    clearInterval(timeRemainingCounter);
+
+    setEloIncrease(Math.max(playerRating - currentUser.currentELO, opponentRating - opponent.currentELO));
     setWinner(winner);
   }
 
