@@ -23,12 +23,12 @@ const rotate180 = (board) => {
   return newBoard;
 }
 
-const OpponentDisplay = styled.div`
+export const OpponentDisplay = styled.div`
   text-align: right;
   margin-bottom: 10px;
 `;
 
-const SelfDisplay = styled.div`
+export const SelfDisplay = styled.div`
  text-align: left;
   margin-top: 10px;
 `;
@@ -117,7 +117,7 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
 
   const firstRender = useFirstRender();
 
-  // used to refreshesh time function if 
+  // used to refresh time function since just setInterval isn't friends with state information
   const [shouldRefreshTimeFunction, setShouldRefreshTimeFunction] = useState(false);
 
   // used in onsnapshot to prevent infinite writes
