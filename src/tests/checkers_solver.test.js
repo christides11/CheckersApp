@@ -112,5 +112,37 @@ describe('check Board Status and Set Up', () => {
 		}
 		expect(actual_moves).toEqual(expected);
 	});
+
+  	test('Unable to move King piece', () => {
+		// Sample Red Pieces
+		testBoard[0][0] = Object.assign({}, testRedPiece);
+		testBoard[0][2] = Object.assign({}, testRedPiece);
+		testBoard[0][4] = Object.assign({}, testRedPiece);
+		testBoard[2][2] = Object.assign({}, testRedKingPiece);
+
+		// Sample Black Pieces
+		testBoard[7][1] = Object.assign({}, testBlackPiece);
+		testBoard[7][3] = Object.assign({}, testBlackPiece);
+		testBoard[7][5] = Object.assign({}, testBlackPiece);
+		testBoard[4][4] = Object.assign({}, testBlackKingPiece);
+
+		let actual = GetMoveableUnits(testBoard, 'RED');
+		var actual_moves = [];
+		let expected = [[1, 1], [1, 1], [1, 3], [1, 3], [1, 5], [3, 3], [1, 3], [3, 1], [1, 1]];
+
+		for (let i = 0; i < actual.length; i++) {
+			actual_moves.push(actual[i]['possiblePosition']);
+		}
+		expect(actual_moves).toEqual(expected);
+
+		actual = GetMoveableUnits(testBoard, 'BLACK');
+		actual_moves = [];
+		expected = [[3,3], [5,3], [3,5], [4,5], [6,2], [6,0], [6,4], [6,2], [6,6], [6,4]];
+
+		for (let i = 0; i < actual.length; i++) {
+			actual_moves.push(actual[i]['possiblePosition']);
+		}
+		expect(actual_moves).not.toStrictEqual(expected);
+	});
 });
 
