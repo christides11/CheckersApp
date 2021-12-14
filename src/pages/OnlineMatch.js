@@ -388,12 +388,6 @@ const Content = ({ setWinner, whichPlayer, setWhichPlayer, opponent, setOpponent
       <div>
         {timeRemainingState.timeRemaining}
       </div>
-      <button onClick={() => {
-        console.log("Turn State:", turnState,
-          "Turn:", turn, "Whichplayer", whichPlayer,
-          "Game in progress", gameInProgress, "Game inp ref", gameInProgressRef, "Game ID", gameID,
-          "Opponent", opponent, "Current user", currentUser);
-      }}>Log State</button>
     </DeadCenter>
     : <DeadCenter>
       Finding Player...
