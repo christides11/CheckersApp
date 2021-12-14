@@ -246,9 +246,6 @@ const Content = ({ setWinner, shouldResetStates }) => {
           return startingBoard;
         })()}
       </Board>
-      <button onClick={() => {
-        console.log("Turn State:", turnState);
-      }}>Log State</button>
       <TurnIcon t={turn}></TurnIcon>
     </DeadCenter>
   )
